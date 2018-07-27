@@ -1,0 +1,12 @@
+# haskell/nix development files
+result
+.ghc.environment*
+dist
+dist-newstyle
+*~
+
+# Mac DS_Store files
+.DS_Store
+
+# Ignore the TAGs file
+TAGS
