@@ -14,7 +14,7 @@ Description :
     de Castro Lopo/Michael Snoyman
 
 Copyright   : (c) Tim Emiola, 2018
-License     : BSD3
+License     : C8D3
 Maintainer  : tim.emiola@gmail.com
 Stability   : experimental
 -}
@@ -32,8 +32,9 @@ where
 import           Control.Exception           (SomeException, handle,
                                               toException)
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
-import qualified Data.ByteString.Char8       as BS
-import qualified Data.ByteString.Lazy.Char8  as LBS
+import qualified Data.ByteString             as BS
+import qualified Data.ByteString.Char8       as C8
+import qualified Data.ByteString.Lazy.Char8  as LC8
 import           Data.Monoid                 ((<>))
 import           Data.String                 (IsString)
 
@@ -56,6 +57,7 @@ import           Network.HTTP.Conduit        (requestBodySourceChunkedIO,
 import           Network.HTTP.Types          (hContentType,
                                               internalServerError500, status304,
                                               status500)
+import           Network.HTTP.Types.Header   (hHost)
 import qualified Network.Wai                 as Wai
 import           Network.Wai.Conduit         (responseRawSource, responseSource,
                                               sourceRequestBody)
@@ -82,6 +84,8 @@ data ProxySettings =
     proxyOnException :: SomeException -> Wai.Response
     -- ^ Timeout value in seconds. Default value: 30
   , proxyTimeout     :: Int
+    -- ^ The host being proxied
+  , proxyHost        :: BS.ByteString
   }
 
 instance Default ProxySettings where
@@ -92,13 +96,14 @@ instance Default ProxySettings where
       proxyOnException = onException
       -- default to 15 seconds
     , proxyTimeout = 15
+    , proxyHost = "localhost"
     }
     where
       onException :: SomeException -> Wai.Response
       onException e =
         Wai.responseLBS internalServerError500
         [ (hContentType, "text/plain; charset=utf-8") ] $
-        LBS.fromChunks [BS.pack $ show e]
+        LC8.fromChunks [C8.pack $ show e]
 
 -- | A Wai Application that acts as a http/https proxy.
 devProxy
@@ -106,17 +111,28 @@ devProxy
   -> Manager
   -> Wai.Application
 devProxy settings manager req respond
-    | Wai.requestMethod req == "CONNECT" =
+    -- we may connect requests to secure sites, when we do, we will not have
+    -- seen their URI properly
+    | Wai.requestMethod req == "CONNECT" = do
+        putStrLn $ "Seen a CONNECT !!! to path " ++ (C8.unpack $ Wai.rawPathInfo req)
         respond $ responseRawSource (handleConnect req)
                     (Wai.responseLBS status500 [("Content-Type", "text/plain")] "method CONNECT is not supported")
     | otherwise = do
-        proxyReq' <- parseRequest $ BS.unpack (Wai.rawPathInfo req <> Wai.rawQueryString req)
+        let scheme
+              | Wai.isSecure req = "https"
+              | otherwise = "http"
+            rawUrl = Wai.rawPathInfo req <> Wai.rawQueryString req
+            effectiveUrl = scheme ++ "://" ++ (C8.unpack $ proxyHost settings) ++ C8.unpack (rawUrl)
+            newHost = proxyHost settings
+            addHostHeader = (:) (hHost, newHost)
+
+        proxyReq' <- parseRequest effectiveUrl
         let onException :: SomeException -> Wai.Response
             onException = proxyOnException settings . toException
 
             proxyReq = proxyReq'
               { method = Wai.requestMethod req
-              , requestHeaders = filter dropRequestHeader $ Wai.requestHeaders req
+              , requestHeaders = addHostHeader $ filter dropUpstreamHeaders $ Wai.requestHeaders req
                 -- always pass redirects back to the client.
               , redirectCount = 0
               , requestBody =
@@ -127,6 +143,7 @@ devProxy settings manager req respond
                       requestBodySourceIO (fromIntegral l) (sourceRequestBody req)
               -- don't modify the response to ensure consistency with the response headers
               , decompress = const False
+              , host = newHost
               }
 
             respondUpstream = withResponse proxyReq manager $ \res -> do
@@ -138,8 +155,8 @@ devProxy settings manager req respond
 
 handleConnect
   :: Wai.Request
-  -> ConduitT () BS.ByteString IO ()
-  -> ConduitT BS.ByteString Void IO ()
+  -> ConduitT () C8.ByteString IO ()
+  -> ConduitT C8.ByteString Void IO ()
   -> IO ()
 handleConnect req fromClient toClient =
   runTCPClient (toClientSettings req) $ \ad -> do
@@ -148,19 +165,22 @@ handleConnect req fromClient toClient =
     (runConduit $ fromClient .| appSink ad)
     (runConduit $ appSource ad .| toClient)
 
-defaultClientPort :: Int
-defaultClientPort = 80
+defaultClientPort :: Wai.Request -> Int
+defaultClientPort req
+  | Wai.isSecure req = 443
+  | otherwise = 90
 
 toClientSettings :: Wai.Request -> ClientSettings
 toClientSettings req =
-  case BS.break (== ':') $ Wai.rawPathInfo req of
-    (host, "") -> clientSettingsTCP defaultClientPort host
-    (host, port') -> case BS.readInt $ BS.drop 1 port' of
+  case C8.break (== ':') $ Wai.rawPathInfo req of
+    (host, "") -> clientSettingsTCP (defaultClientPort req) host
+    (host, port') -> case C8.readInt $ C8.drop 1 port' of
       Just (port, _) -> clientSettingsTCP port host
-      Nothing        -> clientSettingsTCP defaultClientPort host
+      Nothing        -> clientSettingsTCP (defaultClientPort req) host
 
-dropRequestHeader :: (Eq a, IsString a) => (a, b) -> Bool
-dropRequestHeader (k, _) = k `notElem`
+dropUpstreamHeaders :: (Eq a, IsString a) => (a, b) -> Bool
+dropUpstreamHeaders (k, _) = k `notElem`
   [ "content-encoding"
   , "content-length"
+  , "host"
   ]
