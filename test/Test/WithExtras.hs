@@ -12,21 +12,19 @@ import           Control.Exception
 import           Control.Monad                     (when)
 
 import           Network.Socket                    (Socket, close)
-import           Network.Wai                       (Application, responseLBS)
+import           Network.Wai                       (Application)
 import           Network.Wai.Handler.Warp.Internal (settingsBeforeMainLoop)
 
-import           Network.Wai.Handler.Warp          (Port, Settings (..),
+import           Network.Wai.Handler.Warp          (Port, Settings,
                                                     defaultShouldDisplayException,
                                                     defaultSettings,
-                                                    openFreePort,
-                                                    runSettingsSocket)
+                                                    openFreePort)
 import           Network.Wai.Handler.WarpTLS       (TLSSettings,
                                                     runTLSSocket, tlsSettings)
 
-
+-- | The settings used in the integration tests
 defaultTlsSettings :: TLSSettings
 defaultTlsSettings = tlsSettings "test/certificate.pem" "test/key.pem"
-
 
 -- | Runs the given 'Application' on a free port. Passes the port to the given
 -- operation and executes it, while the 'Application' is running. Shuts down the

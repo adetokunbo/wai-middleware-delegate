@@ -2,7 +2,7 @@
 {-|
 Module      : Network.Wai.Middleware.Delegate
 Description :
-  Provides Wai middleware that delegate to handling of requests
+  Provides a Wai middleware delegates handling of requests.
 
   - delegateTo: delegates handling of requests matching a predicate to a
     delegate Application
@@ -62,17 +62,18 @@ import qualified Network.Wai                 as Wai
 import           Network.Wai.Conduit         (responseRawSource, responseSource,
                                               sourceRequestBody)
 
--- Determines if a request should be handled by a delegate.
+-- | Type alias for a function that determines if a request should be handled by
+-- a delegate.
 type RequestPredicate = Wai.Request -> Bool
 
--- Create a middleware that handles all requests matching a predicate by
+-- | Create a middleware that handles all requests matching a predicate by
 -- delegating to an alternate Application.
 delegateTo :: Wai.Application -> RequestPredicate -> Wai.Middleware
 delegateTo alt f actual req
   | f req = alt req
   | otherwise = actual req
 
--- Creates a middleware that handles all requests matching a predicate by
+-- | Creates a middleware that handles all requests matching a predicate by
 -- proxing them to a host specified by ProxySettings.
 delegateToProxy :: ProxySettings -> Manager -> RequestPredicate -> Wai.Middleware
 delegateToProxy settings mgr = delegateTo (devProxy settings mgr)
@@ -80,11 +81,11 @@ delegateToProxy settings mgr = delegateTo (devProxy settings mgr)
 -- | Settings that configure the proxy endpoint.
 data ProxySettings =
   ProxySettings
-  { -- ^ What to do with exceptions thrown by either the application or server.
+  { -- | What to do with exceptions thrown by either the application or server.
     proxyOnException :: SomeException -> Wai.Response
-    -- ^ Timeout value in seconds. Default value: 30
+    -- | Timeout value in seconds. Default value: 30
   , proxyTimeout     :: Int
-    -- ^ The host being proxied
+    -- | The host being proxied
   , proxyHost        :: BS.ByteString
   }
 

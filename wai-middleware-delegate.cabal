@@ -1,8 +1,8 @@
 name:               wai-middleware-delegate
 version:            0.1.0.0
-synopsis:           WAI middleware that delegates requests to other Wai Applications or hosts
+synopsis:           WAI middleware that delegates handling of requests.
 description:        WAI middleware to intercept requests that match a predicate and
-                    respond to them using other Applications or proxied hosts. [WAI]
+                    respond to them using other WAI Applications or proxied hosts. [WAI]
                     <http://hackage.haskell.org/package/wai>
 license:            BSD3
 license-file:       LICENSE

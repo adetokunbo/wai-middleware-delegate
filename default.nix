@@ -19,6 +19,7 @@ mkDerivation {
     hspec http-client http-client-tls http-conduit http-types network
     random resourcet text vault wai wai-conduit warp warp-tls
   ];
-  description = "WAI middleware that delegates requests to other Wai Applications or hosts";
+  homepage = "https://github.com/adetokunbo/wai-middleware-delegate";
+  description = "WAI middleware that delegates handling of requests";
   license = stdenv.lib.licenses.bsd3;
 }
