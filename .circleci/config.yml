@@ -1,0 +1,54 @@
+version: 2
+
+aliases: &build
+  environment:
+    BASH_ENV: "~/.nix-profile/etc/profile.d/nix.sh"
+
+  machine: true
+
+  parallelism: 2
+
+  steps:
+    - checkout
+
+    - run:
+        name: create a fake /nix
+        command: sudo mkdir -m 0755 /nix && sudo chown circleci /nix
+
+    # Restore the nix installation to its state after the previous test run.
+    # This should prevent unnecessary rebuilds of dependencies without impacting
+    # the tests themselves.
+
+    - restore_cache:
+        keys:
+          - nix-root-v1-{{ arch }}-{{ checksum "release.nix" }}
+
+    - restore_cache:
+        keys:
+          - nix-dotnix-v1-{{ arch }}-{{ checksum "release.nix" }}
+
+    - run:
+        name: install nix
+        command: |
+          [[ -d ~/.nix-defexpr ]] ||
+          curl https://nixos.org/nix/install | sh
+
+    - run:
+        name: build and test
+        command: nix-build --argstr system x86_64-linux release.nix
+
+    # Save /nix and the nix user folders to the cache.
+
+    - save_cache:
+        key: nix-root-v1-{{ arch }}-{{ checksum "release.nix" }}
+        paths:
+          - /nix
+
+    - save_cache:
+        key: nix-dotnix-v1-{{ arch }}-{{ checksum "release.nix" }}
+        paths:
+          - ~/.nix-profile
+          - ~/.nix-defexpr
+
+jobs:
+  build: *build
