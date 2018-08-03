@@ -2,7 +2,7 @@
 {-|
 Module      : Network.Wai.Middleware.Delegate
 Description :
-  Provides a Wai middleware delegates handling of requests.
+  Provides a Wai middleware that delegates handling of requests.
 
   - delegateTo: delegates handling of requests matching a predicate to a
     delegate Application
@@ -10,7 +10,7 @@ Description :
   - delegateToProxy : delegates handling of requests matching a predicate to
     different host
 
-  - devProxy: is a simple reverse proxy, based on proxyApp of http-proxy by Erik
+  - simpleProxy: is a simple reverse proxy, based on proxyApp of http-proxy by Erik
     de Castro Lopo/Michael Snoyman
 
 Copyright   : (c) Tim Emiola, 2018
@@ -22,7 +22,7 @@ Stability   : experimental
 module Network.Wai.Middleware.Delegate
   ( delegateTo
   , delegateToProxy
-  , devProxy
+  , simpleProxy
   , ProxySettings(..)
   , RequestPredicate
   )
@@ -76,7 +76,7 @@ delegateTo alt f actual req
 -- | Creates a middleware that handles all requests matching a predicate by
 -- proxing them to a host specified by ProxySettings.
 delegateToProxy :: ProxySettings -> Manager -> RequestPredicate -> Wai.Middleware
-delegateToProxy settings mgr = delegateTo (devProxy settings mgr)
+delegateToProxy settings mgr = delegateTo (simpleProxy settings mgr)
 
 -- | Settings that configure the proxy endpoint.
 data ProxySettings =
@@ -107,11 +107,11 @@ instance Default ProxySettings where
         LC8.fromChunks [C8.pack $ show e]
 
 -- | A Wai Application that acts as a http/https proxy.
-devProxy
+simpleProxy
   :: ProxySettings
   -> Manager
   -> Wai.Application
-devProxy settings manager req respond
+simpleProxy settings manager req respond
     -- we may connect requests to secure sites, when we do, we will not have
     -- seen their URI properly
     | Wai.requestMethod req == "CONNECT" = do
