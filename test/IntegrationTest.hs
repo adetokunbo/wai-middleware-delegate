@@ -24,6 +24,7 @@ import           Test.Hspec
 import           Test.HttpReply
 import           Test.TestRequests               (RequestBuilder (..),
                                                   buildRequest,
+                                                  testOverRedirectedRequests,
                                                   testNotProxiedRequests,
                                                   testRequests)
 import           Test.WithExtras                 (defaultTlsSettings,
@@ -32,13 +33,19 @@ import           Test.WithExtras                 (defaultTlsSettings,
 defaultTestSettings :: ProxySettings
 defaultTestSettings = def { proxyHost = "httpbin.org", proxyTimeout = 2 }
 
+redirectTestSettings :: ProxySettings
+redirectTestSettings = defaultTestSettings { proxyRedirectCount = 2 }
+
 main :: IO ()
 main = do
   dumpDebug' <- lookupEnv "DEBUG"
   let dumpDebug = maybe False (const True) dumpDebug'
   hspec $ do
+    insecureRedirectTest dumpDebug
     insecureProxyTest dumpDebug
+    insecureNotProxiedTest dumpDebug
     secureProxyTest dumpDebug
+    secureNotProxiedTest dumpDebug
 
 defaultTestDelegate :: ProxySettings -> IO Application
 defaultTestDelegate s = do
@@ -51,6 +58,9 @@ defaultTestDelegate s = do
 
 testWithInsecureProxy :: (Port -> IO ()) -> IO ()
 testWithInsecureProxy = testWithApplication (defaultTestDelegate defaultTestSettings)
+
+testWithInsecureRedirects :: (Port -> IO ()) -> IO ()
+testWithInsecureRedirects = testWithApplication (defaultTestDelegate redirectTestSettings)
 
 testWithSecureProxy :: (Port -> IO ()) -> IO ()
 testWithSecureProxy = testWithTLSApplication defaultTlsSettings (defaultTestDelegate defaultTestSettings)
@@ -81,18 +91,47 @@ onDirectAndProxy f debug testProxyPort builder = do
     print proxied
   f direct proxied
 
+insecureNotProxiedTest :: Bool -> Spec
+insecureNotProxiedTest debug =
+  let scheme = "HTTP"
+      desc = "Proxy on " ++ scheme ++ " should fail"
+      assertNeq = onDirectAndProxy assertHttpRepliesDiffer debug
+  in
+    around testWithInsecureProxy $ describe desc $ do
+    for_ testNotProxiedRequests $ \(title, modifier) ->
+      it (scheme ++ " " ++ title) $ \port -> assertNeq port $ modifier def
+
+insecureRedirectTest :: Bool -> Spec
+insecureRedirectTest debug =
+  let scheme = "HTTP"
+      desc = "Proxy over " ++ scheme ++ " with too many redirects differs"
+      assertNeq = onDirectAndProxy assertHttpRepliesDiffer debug
+  in
+    around testWithInsecureRedirects $ describe desc $ do
+    for_ testOverRedirectedRequests $ \(title, modifier) ->
+      it (scheme ++ " " ++ title) $ \port -> assertNeq port $ modifier def
+
 insecureProxyTest :: Bool -> Spec
 insecureProxyTest debug =
   let scheme = "HTTP"
       desc = "Simple " ++ scheme ++ " proxying:"
       assertEq = onDirectAndProxy assertHttpRepliesAreEq debug
-      assertNeq = onDirectAndProxy assertHttpRepliesDiffer debug
   in
     around testWithInsecureProxy $ describe desc $ do
     for_ testRequests $ \(title, modifier) ->
       it (scheme ++ " " ++ title) $ \port -> assertEq port $ modifier def
+
+secureNotProxiedTest :: Bool -> Spec
+secureNotProxiedTest debug =
+  let
+    scheme = "HTTPS"
+    desc = "Proxy on " ++ scheme ++ " should fail"
+    assertNeq = onDirectAndProxy assertHttpRepliesDiffer debug
+    def' = def { rbSecure = True }
+  in
+    around testWithSecureProxy $ describe desc $ do
     for_ testNotProxiedRequests $ \(title, modifier) ->
-      it (scheme ++ " " ++ title) $ \port -> assertNeq port $ modifier def
+      it (scheme ++ " " ++ title) $ \port -> assertNeq port $ modifier def'
 
 secureProxyTest :: Bool -> Spec
 secureProxyTest debug =
@@ -100,11 +139,8 @@ secureProxyTest debug =
     scheme = "HTTPS"
     desc = "Simple " ++ scheme ++ " proxying:"
     assertEq = onDirectAndProxy assertHttpRepliesAreEq debug
-    assertNeq = onDirectAndProxy assertHttpRepliesDiffer debug
     def' = def { rbSecure = True }
   in
     around testWithSecureProxy $ describe desc $ do
     for_ testRequests $ \(title, modifier) ->
       it (scheme ++ " " ++ title) $ \port -> assertEq port $ modifier def'
-    for_ testNotProxiedRequests $ \(title, modifier) ->
-      it (scheme ++ " " ++ title) $ \port -> assertNeq port $ modifier def'

@@ -8,6 +8,7 @@ module Test.TestRequests
     , testGetRequests
     , testPostRequests
     , testNotProxiedRequests
+    , testOverRedirectedRequests
     ) where
 
 import qualified Data.ByteString       as BS
@@ -49,6 +50,8 @@ testGetRequests =
     , (\builder -> builder {rbPath = "/get"}))
   , ("GET (with a query)"
     , (\builder -> builder {rbPath = "/get?a=10&b=whatever"}))
+  , ("GET (multiple redirects)"
+    , (\builder -> builder {rbPath = "/redirect/3"}))
   , ("GET (with a body)"
     , (\builder -> builder
         { rbPath = "/get"
@@ -64,6 +67,12 @@ testNotProxiedRequests :: [(String, RequestBuilder -> RequestBuilder)]
 testNotProxiedRequests =
   [ ("GET (funny resource - differs on proxy)"
     , (\builder -> builder {rbPath = "/status/418"}))
+  ]
+
+testOverRedirectedRequests :: [(String, RequestBuilder -> RequestBuilder)]
+testOverRedirectedRequests =
+  [ ("GET (multiple redirects)"
+    , (\builder -> builder {rbPath = "/redirect/3"}))
   ]
 
 testPostRequests :: [(String, RequestBuilder -> RequestBuilder)]

@@ -2,7 +2,8 @@
 {-|
 Module      : Network.Wai.Middleware.Delegate
 Description :
-  Provides a Wai middleware that delegates handling of requests.
+  Provides a Wai middleware1
+that delegates handling of requests.
 
   - delegateTo: delegates handling of requests matching a predicate to a
     delegate Application
@@ -87,6 +88,8 @@ data ProxySettings =
   , proxyTimeout     :: Int
     -- | The host being proxied
   , proxyHost        :: BS.ByteString
+    -- | The number of redirects to follow. 0 means none, which is the default.
+  , proxyRedirectCount    :: Int
   }
 
 instance Default ProxySettings where
@@ -98,6 +101,7 @@ instance Default ProxySettings where
       -- default to 15 seconds
     , proxyTimeout = 15
     , proxyHost = "localhost"
+    , proxyRedirectCount = 0
     }
     where
       onException :: SomeException -> Wai.Response
@@ -135,7 +139,7 @@ simpleProxy settings manager req respond
               { method = Wai.requestMethod req
               , requestHeaders = addHostHeader $ filter dropUpstreamHeaders $ Wai.requestHeaders req
                 -- always pass redirects back to the client.
-              , redirectCount = 0
+              , redirectCount = proxyRedirectCount settings
               , requestBody =
                   case Wai.requestBodyLength req of
                     Wai.ChunkedBody ->
