@@ -1,5 +1,5 @@
 name:               wai-middleware-delegate
-version:            0.1.0.0
+version:            0.1.1.0
 synopsis:           WAI middleware that delegates handling of requests.
 description:        WAI middleware to intercept requests that match a predicate and
                     respond to them using other WAI Applications or proxied hosts. [WAI]
