@@ -1,4 +1,4 @@
-{ system ? "x86_64-darwin"
+{ system ? builtins.currentSystem
 }:
 let
   overlays = import ./overlays.nix;
