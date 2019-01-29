@@ -35,7 +35,7 @@ aliases: &build
 
     - run:
         name: build and test
-        command: nix build -f build.nix
+        command: nix build --option build-use-sandbox false -f build.nix
 
     # Save /nix and the nix user folders to the cache.
 
