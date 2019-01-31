@@ -1,1 +1,1 @@
-(import ./release.nix {}).wai-middleware-delegate.env
+(import ./build.nix {}).env.haskell.withEnvTools (pkgs: [ ])
