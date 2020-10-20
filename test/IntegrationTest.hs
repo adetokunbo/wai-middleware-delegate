@@ -41,7 +41,8 @@ main = do
   dumpDebug' <- lookupEnv "DEBUG"
   let dumpDebug = maybe False (const True) dumpDebug'
   hspec $ do
-    insecureRedirectTest dumpDebug
+    -- TOOD: reenable when the public /redirect link on http-bin is working ok
+    -- insecureRedirectTest dumpDebug
     insecureProxyTest dumpDebug
     insecureNotProxiedTest dumpDebug
     secureProxyTest dumpDebug

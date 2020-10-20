@@ -11,6 +11,7 @@ module Test.HttpReply
 
 where
 
+import           Data.ByteString       (ByteString)
 import qualified Data.ByteString       as BS
 import qualified Data.ByteString.Char8 as C8
 import           Data.List             (intercalate)
@@ -19,13 +20,12 @@ import           Network.HTTP.Types    (Header, HeaderName)
 
 import           Data.CaseInsensitive  (original)
 
-data HttpReply =
-  HttpReply
-  { hrSecure  :: !Bool
-  , hrStatus  :: !Int
-  , hrHeaders :: ![Header]
-  , hrBytes   :: !BS.ByteString
-  }
+data HttpReply = HttpReply
+    { hrSecure  :: !Bool
+    , hrStatus  :: !Int
+    , hrHeaders :: ![Header]
+    , hrBytes   :: !BS.ByteString
+    }
 
 instance Show HttpReply where
   show r = intercalate "\n" $
@@ -36,13 +36,13 @@ instance Show HttpReply where
     where
       concatHeader (f, v) = BS.concat [ "  ", original f , ": " , v]
 
-data HttpReplyMismatch
-  = StatusMismatch Int Int
-  | HeaderMismatch HeaderName (Maybe C8.ByteString) (Maybe C8.ByteString)
-  | BodyMismatch BS.ByteString BS.ByteString
-  | MissingViaHeader
-  | UnexpectedViaHeader
-  deriving (Eq)
+data HttpReplyMismatch = StatusMismatch Int Int
+    | HeaderMismatch HeaderName (Maybe C8.ByteString)
+                 (Maybe C8.ByteString)
+    | BodyMismatch BS.ByteString BS.ByteString
+    | MissingViaHeader
+    | UnexpectedViaHeader
+    deriving (Eq)
 
 instance Show HttpReplyMismatch where
   show (StatusMismatch x y)= "HTTP status codes don't match : " ++ show x ++ " /= " ++ show y
@@ -68,7 +68,7 @@ compareHttpReplies direct proxied = catMaybes mbMismatches
   where
     mbMismatches =
       [ compare' hrStatus StatusMismatch
-      , compare' hrBytes BodyMismatch
+      , compareBodys (hrBytes direct) (hrBytes proxied)
       , missingViaHeader
       , unexpectedViaHeader
       , mismatchedHeader "server"
@@ -91,3 +91,22 @@ compareHttpReplies direct proxied = catMaybes mbMismatches
       | otherwise = Nothing
         where x' = maybeHeader name direct
               y' = maybeHeader name proxied
+
+
+compareBodys :: ByteString -> ByteString -> Maybe HttpReplyMismatch
+compareBodys direct proxied =
+  let direct' =  replaceAmznTraceId direct
+      proxied' = replaceAmznTraceId proxied
+      compare' a b
+        | a == b = Nothing
+        | otherwise = Just $ BodyMismatch a b
+  in
+    compare' direct' proxied'
+
+
+replaceAmznTraceId :: ByteString -> ByteString
+replaceAmznTraceId x =
+  let asLines = C8.lines x
+      checkTrace y = "X-Amzn-Trace-Id" `C8.isInfixOf` y
+      dropTrace y = if checkTrace y then Nothing else Just y
+  in C8.unlines $ catMaybes $ dropTrace <$> asLines
