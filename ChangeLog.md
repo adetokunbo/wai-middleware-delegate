@@ -2,6 +2,11 @@
 
 `wai-middleware-delegate` uses [PVP Versioning][1].
 
+## 0.1.2.1 -- 2021-09-29
+
+* Relax some dependency upper-bounds
+* Compile with a later version of GHC
+
 
 ## 0.1.2.0 -- 2020-10-20
 
