@@ -1,6 +1,7 @@
 # wai-middleware-delegate
 
-[![CircleCI](https://circleci.com/gh/adetokunbo/wai-middleware-delegate.svg?style=svg)](https://circleci.com/gh/adetokunbo/wai-middleware-delegate)
+[![Hackage](https://img.shields.io/hackage/v/wai-middleware-delegate.svg)](https://hackage.haskell.org/package/wai-middleware-delegate)
+[![GitHub CI](https://github.com/adetokunbo/wai-middleware-delegate/actions/workflows/ci.yml/badge.svg)](https://github.com/adetokunbo/wai-middleware-delegate/actions)
 [![BSD3](https://img.shields.io/badge/license-BSD3-green.svg?dummy)](https://github.com/adetokunbo/wai-middleware-delegate/blob/master/LICENSE)
 
 `wai-middleware-delegate` is a [WAI][1] middleware that allows requests to be
