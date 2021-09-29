@@ -4,17 +4,14 @@
 module Main where
 
 import           Control.Monad                   (when)
-import           Data.Foldable                   (for_)
-import           Data.Maybe                      (maybe)
-import           System.Environment              (lookupEnv)
-
 import           Data.Default                    (Default (..))
+import           Data.Foldable                   (for_)
 import           Network.HTTP.Client.TLS         (newTlsManager)
 import           Network.HTTP.Types              (status500)
 import           Network.Wai                     (Application, rawPathInfo,
                                                   responseLBS)
 import           Network.Wai.Handler.Warp        (Port, testWithApplication)
-
+import           System.Environment              (lookupEnv)
 
 import           Network.Wai.Middleware.Delegate (ProxySettings (..),
                                                   delegateToProxy)
@@ -24,8 +21,8 @@ import           Test.Hspec
 import           Test.HttpReply
 import           Test.TestRequests               (RequestBuilder (..),
                                                   buildRequest,
-                                                  testOverRedirectedRequests,
                                                   testNotProxiedRequests,
+                                                  testOverRedirectedRequests,
                                                   testRequests)
 import           Test.WithExtras                 (defaultTlsSettings,
                                                   testWithTLSApplication)
