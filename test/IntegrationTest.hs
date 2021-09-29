@@ -3,6 +3,7 @@
 
 module Main where
 
+import           System.IO
 import           Control.Monad                   (when)
 import           Data.Default                    (Default (..))
 import           Data.Foldable                   (for_)
@@ -35,6 +36,8 @@ redirectTestSettings = defaultTestSettings { proxyRedirectCount = 2 }
 
 main :: IO ()
 main = do
+  hSetBuffering stdin NoBuffering
+  hSetBuffering stdout NoBuffering
   dumpDebug' <- lookupEnv "DEBUG"
   let dumpDebug = maybe False (const True) dumpDebug'
   hspec $ do
