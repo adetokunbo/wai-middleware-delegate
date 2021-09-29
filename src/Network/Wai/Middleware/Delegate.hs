@@ -1,30 +1,35 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-|
-Module      : Network.Wai.Middleware.Delegate
-Description :
-  Provides a Wai middleware1
-that delegates handling of requests.
+Copyright   : (c) 2018-2021 Tim Emiola
+SPDX-License-Identifier: BSD3
+Maintainer  : Tim Emiola <tim.emiola@gmail.com>
 
-  - delegateTo: delegates handling of requests matching a predicate to a
-    delegate Application
+Provides a [WAI](https://hackage.haskell.com/packages/wai) middleware that
+delegates handling of requests.
 
-  - delegateToProxy : delegates handling of requests matching a predicate to
-    different host
+Provides 3 combinators that create middleware along with supporting data types.
 
-  - simpleProxy: is a simple reverse proxy, based on proxyApp of http-proxy by Erik
-    de Castro Lopo/Michael Snoyman
+* 'delegateTo': delegates handling of requests matching a predicate to a
+  delegate Application
 
-Copyright   : (c) Tim Emiola, 2018
-License     : C8D3
-Maintainer  : tim.emiola@gmail.com
-Stability   : experimental
+* 'delegateToProxy': delegates handling of requests matching a predicate to
+  different host
+
+* 'simpleProxy': is a simple reverse proxy, based on proxyApp of http-proxy by
+  Erik de Castro Lopo/Michael Snoyman
+
 -}
 
 module Network.Wai.Middleware.Delegate
-  ( delegateTo
+  ( -- * Middleware
+    delegateTo
   , delegateToProxy
   , simpleProxy
+
+    -- * Configuration
   , ProxySettings(..)
+
+    -- * Aliases
   , RequestPredicate
   )
 
@@ -83,13 +88,13 @@ delegateToProxy settings mgr = delegateTo (simpleProxy settings mgr)
 data ProxySettings =
   ProxySettings
   { -- | What to do with exceptions thrown by either the application or server.
-    proxyOnException :: SomeException -> Wai.Response
+    proxyOnException   :: SomeException -> Wai.Response
     -- | Timeout value in seconds. Default value: 30
-  , proxyTimeout     :: Int
+  , proxyTimeout       :: Int
     -- | The host being proxied
-  , proxyHost        :: BS.ByteString
+  , proxyHost          :: BS.ByteString
     -- | The number of redirects to follow. 0 means none, which is the default.
-  , proxyRedirectCount    :: Int
+  , proxyRedirectCount :: Int
   }
 
 instance Default ProxySettings where
