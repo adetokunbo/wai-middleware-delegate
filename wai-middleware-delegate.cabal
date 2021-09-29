@@ -1,4 +1,4 @@
-cabal-version:      2.0
+cabal-version:      3.0
 name:               wai-middleware-delegate
 version:            0.1.2.1
 synopsis:           WAI middleware that delegates handling of requests.
@@ -10,7 +10,7 @@ description:
   Read this [short example](https://github.com/adetokunbo/wai-middleware-delegate#readme)
   for an introduction to its usage.
 
-license:            BSD3
+license:            BSD-3-Clause
 license-file:       LICENSE
 author:             Tim Emiola
 maintainer:         tim.emiola@gmail.com
