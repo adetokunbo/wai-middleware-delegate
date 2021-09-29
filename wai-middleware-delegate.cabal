@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               wai-middleware-delegate
-version:            0.1.2.1
+version:            0.1.2.2
 synopsis:           WAI middleware that delegates handling of requests.
 description:
   [WAI](http://hackage.haskell.org/package/wai) middleware that intercepts requests
