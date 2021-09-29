@@ -7,18 +7,20 @@ description:
   that match a predicate and respond to them using other @WAI@ Applications or
   proxied hosts.
 
+  Read this [short example](https://github.com/adetokunbo/wai-middleware-delegate#readme)
+  for an introduction to its usage.
+
 license:            BSD3
 license-file:       LICENSE
 author:             Tim Emiola
 maintainer:         tim.emiola@gmail.com
 category:           Web
-homepage:           https://github.com/adetokunbo/wai-middleware-delegate
+homepage:           https://github.com/adetokunbo/wai-middleware-delegate#readme
 bug-reports:
   https://github.com/adetokunbo/wai-middleware-delegate/issues
 
 build-type:         Simple
 extra-source-files:
-  README.md
   ChangeLog.md
 
 source-repository head
