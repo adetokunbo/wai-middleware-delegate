@@ -13,9 +13,8 @@ module Test.TestRequests
 
 import qualified Data.ByteString       as BS
 import qualified Data.ByteString.Char8 as C8
-import           Data.Maybe            (fromMaybe, maybe)
-
 import           Data.Default          (Default (..))
+import           Data.Maybe            (fromMaybe)
 import           Network.HTTP.Client   (Request, RequestBody (..), host, method,
                                         parseRequest, redirectCount,
                                         requestBody)
