@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               wai-middleware-delegate
-version:            0.1.2.2
+version:            0.1.2.3
 synopsis:           WAI middleware that delegates handling of requests.
 description:
   [WAI](http://hackage.haskell.org/package/wai) middleware that intercepts requests
@@ -22,6 +22,8 @@ bug-reports:
 build-type:         Simple
 extra-source-files:
   ChangeLog.md
+  test/*.csr
+  test/*.pem
 
 source-repository head
   type:     git
@@ -57,6 +59,7 @@ test-suite integration-test
     Test.HttpReply
     Test.TestRequests
     Test.WithExtras
+    Paths_wai_middleware_delegate
 
   hs-source-dirs:   test
   build-depends:
