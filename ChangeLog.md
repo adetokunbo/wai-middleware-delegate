@@ -2,6 +2,10 @@
 
 `wai-middleware-delegate` uses [PVP Versioning][1].
 
+## 0.1.2.4 -- 2021-09-30
+
+* Fix cabal reference to data files
+
 ## 0.1.2.3 -- 2021-09-30
 
 * Add missing data files needed by the tests
