@@ -64,7 +64,9 @@ testWithInsecureRedirects :: (Port -> IO ()) -> IO ()
 testWithInsecureRedirects = testWithApplication (defaultTestDelegate redirectTestSettings)
 
 testWithSecureProxy :: (Port -> IO ()) -> IO ()
-testWithSecureProxy = testWithTLSApplication defaultTlsSettings (defaultTestDelegate defaultTestSettings)
+testWithSecureProxy withPort = do
+  tls <- defaultTlsSettings
+  testWithTLSApplication tls (defaultTestDelegate defaultTestSettings) withPort
 
 onDirectAndProxy :: (HttpReply -> HttpReply -> IO ()) -> Bool -> Int -> RequestBuilder -> IO ()
 onDirectAndProxy f debug testProxyPort builder = do

@@ -14,17 +14,22 @@ import           Control.Monad                     (when)
 import           Network.Socket                    (Socket, close)
 import           Network.Wai                       (Application)
 import           Network.Wai.Handler.Warp.Internal (settingsBeforeMainLoop)
-
 import           Network.Wai.Handler.Warp          (Port, Settings,
-                                                    defaultShouldDisplayException,
                                                     defaultSettings,
+                                                    defaultShouldDisplayException,
                                                     openFreePort)
-import           Network.Wai.Handler.WarpTLS       (TLSSettings,
-                                                    runTLSSocket, tlsSettings)
+import           Network.Wai.Handler.WarpTLS       (TLSSettings, runTLSSocket,
+                                                    tlsSettings)
+
+import           Paths_wai_middleware_delegate     (getDataFileName)
 
 -- | The settings used in the integration tests
-defaultTlsSettings :: TLSSettings
-defaultTlsSettings = tlsSettings "test/certificate.pem" "test/key.pem"
+defaultTlsSettings :: IO TLSSettings
+defaultTlsSettings =
+  tlsSettings
+ <$> (getDataFileName "test/certificate.pem")
+ <*> (getDataFileName "test/key.pem")
+
 
 -- | Runs the given 'Application' on a free port. Passes the port to the given
 -- operation and executes it, while the 'Application' is running. Shuts down the
