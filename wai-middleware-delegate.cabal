@@ -54,6 +54,7 @@ library
 test-suite integration-test
   type:             exitcode-stdio-1.0
   main-is:          IntegrationTest.hs
+  autogen-modules:  Paths_wai_middleware_delegate
   other-modules:
     Test.Fetch
     Test.HttpReply
