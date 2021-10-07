@@ -1,7 +1,7 @@
 # wai-middleware-delegate
 
-[![Hackage](https://img.shields.io/hackage/v/wai-middleware-delegate.svg)](https://hackage.haskell.org/package/wai-middleware-delegate)
 [![GitHub CI](https://github.com/adetokunbo/wai-middleware-delegate/actions/workflows/ci.yml/badge.svg)](https://github.com/adetokunbo/wai-middleware-delegate/actions)
+[![Hackage](https://img.shields.io/hackage/v/wai-middleware-delegate.svg)](https://hackage.haskell.org/package/wai-middleware-delegate)
 [![Stackage Nightly](http://stackage.org/package/wai-middleware-delegate/badge/nightly)](http://stackage.org/nightly/package/wai-middleware-delegate)
 [![BSD3](https://img.shields.io/badge/license-BSD3-green.svg?dummy)](https://github.com/adetokunbo/wai-middleware-delegate/blob/master/LICENSE)
 
