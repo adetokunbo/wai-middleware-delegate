@@ -1,8 +1,9 @@
 # wai-middleware-delegate
 
 [![GitHub CI](https://github.com/adetokunbo/wai-middleware-delegate/actions/workflows/ci.yml/badge.svg)](https://github.com/adetokunbo/wai-middleware-delegate/actions)
-[![Hackage](https://img.shields.io/hackage/v/wai-middleware-delegate.svg)](https://hackage.haskell.org/package/wai-middleware-delegate)
 [![Stackage Nightly](http://stackage.org/package/wai-middleware-delegate/badge/nightly)](http://stackage.org/nightly/package/wai-middleware-delegate)
+[![Hackage][hackage-badge]][hackage]
+[![Hackage Dependencies][hackage-deps-badge]][hackage-deps]
 [![BSD3](https://img.shields.io/badge/license-BSD3-green.svg?dummy)](https://github.com/adetokunbo/wai-middleware-delegate/blob/master/LICENSE)
 
 `wai-middleware-delegate` is a [WAI][1] middleware that allows requests to be
@@ -42,3 +43,8 @@ main = httpBin demoSettings >>= run 3000
 ```
 
 [1]: https://hackage.haskell.org/package/wai
+[hackage-deps-badge]: <https://img.shields.io/hackage-deps/v/wai-middleware-delegate.svg>
+[hackage-deps]:       <http://packdeps.haskellers.com/feed?needle=wai-middleware-delegate>
+[hackage-badge]:      <https://img.shields.io/hackage/v/wai-middleware-delegate.svg>
+[hackage]:            <https://hackage.haskell.org/package/wai-middleware-delegate>
+
