@@ -124,7 +124,6 @@ simpleProxy settings manager req respond
     -- we may connect requests to secure sites, when we do, we will not have
     -- seen their URI properly
     | Wai.requestMethod req == "CONNECT" = do
-        putStrLn $ "Seen a CONNECT !!! to path " ++ (C8.unpack $ Wai.rawPathInfo req)
         respond $ responseRawSource (handleConnect req)
                     (Wai.responseLBS status500 [("Content-Type", "text/plain")] "method CONNECT is not supported")
     | otherwise = do
