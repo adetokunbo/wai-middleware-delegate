@@ -1,5 +1,5 @@
 # haskell/nix development files
-result
+result*
 .ghc.environment*
 dist
 dist-newstyle
