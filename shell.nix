@@ -12,6 +12,7 @@ in
       hlint = "latest"; # Selects the latest version in the hackage.nix snapshot
       haskell-language-server = "latest";
       ghcid = "latest";
+      fourmolu = "latest";
     };
     # See overlays/tools.nix for more details
 
