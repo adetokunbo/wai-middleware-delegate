@@ -74,7 +74,9 @@ import Network.HTTP.Conduit (
   requestBodySourceChunkedIO,
   requestBodySourceIO,
  )
+import Network.HTTP.Simple (Header)
 import Network.HTTP.Types (
+  HeaderName,
   hContentType,
   internalServerError500,
   status304,
@@ -151,7 +153,7 @@ simpleProxy ::
 simpleProxy settings manager req respond
   -- we may connect requests to secure sites, when we do, we will not have
   -- seen their URI properly
-  | Wai.requestMethod req == "CONNECT" = do
+  | Wai.requestMethod req == "CONNECT" =
     respond $
       responseRawSource
         (handleConnect req)
@@ -161,7 +163,7 @@ simpleProxy settings manager req respond
           | Wai.isSecure req = "https"
           | otherwise = "http"
         rawUrl = Wai.rawPathInfo req <> Wai.rawQueryString req
-        effectiveUrl = scheme ++ "://" ++ (C8.unpack $ proxyHost settings) ++ C8.unpack (rawUrl)
+        effectiveUrl = scheme ++ "://" ++ C8.unpack (proxyHost settings) ++ C8.unpack rawUrl
         newHost = proxyHost settings
         addHostHeader = (:) (hHost, newHost)
 
@@ -188,7 +190,7 @@ simpleProxy settings manager req respond
 
         respondUpstream = withResponse proxyReq manager $ \res -> do
           let body = mapOutput (Chunk . fromByteString) . bodyReaderSource $ responseBody res
-              headers = (mk "X-Via-Proxy", "yes") : (responseHeaders res)
+              headers = (mk "X-Via-Proxy", "yes") : responseHeaders res
           respond $ responseSource (responseStatus res) headers body
 
     handle (respond . onException) respondUpstream
@@ -222,10 +224,9 @@ toClientSettings req =
       Nothing -> clientSettingsTCP (defaultClientPort req) host
 
 
-dropUpstreamHeaders :: (Eq a, IsString a) => (a, b) -> Bool
-dropUpstreamHeaders (k, _) =
-  k
-    `notElem` [ "content-encoding"
-              , "content-length"
-              , "host"
-              ]
+dropUpstreamHeaders :: (HeaderName, b) -> Bool
+dropUpstreamHeaders (k, _) = k `notElem` preservedHeaders
+
+
+preservedHeaders :: [HeaderName]
+preservedHeaders = ["content-encoding", "content-length", "host"]
