@@ -12,7 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: fourmolu/fourmolu-action@v9
+      - uses: haskell-actions/run-fourmolu@v9
+        with:
+          version: "0.13.0.0"
   build:
     runs-on: ubuntu-latest
     needs: fourmolu
