@@ -1,4 +1,7 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 
 {- |
 Copyright   : (c) 2018-2021 Tim Emiola
@@ -19,8 +22,8 @@ Provides 3 combinators that create middleware along with supporting data types.
 * 'simpleProxy': is a simple reverse proxy, based on proxyApp of http-proxy by
   Erik de Castro Lopo/Michael Snoyman
 -}
-module Network.Wai.Middleware.Delegate (
-  -- * Middleware
+module Network.Wai.Middleware.Delegate
+  ( -- * Middleware
     delegateTo
   , delegateToProxy
   , simpleProxy
@@ -30,65 +33,73 @@ module Network.Wai.Middleware.Delegate (
 
     -- * Aliases
   , RequestPredicate
-) where
+  )
+where
 
 import Blaze.ByteString.Builder (fromByteString)
 import Control.Concurrent.Async (race_)
-import Control.Exception (
-  SomeException
+import Control.Exception
+  ( SomeException
   , handle
   , toException
- )
+  )
+import Control.Monad (unless)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy.Char8 as LC8
 import Data.CaseInsensitive (mk)
-import Data.Conduit (
-  ConduitT
+import Data.Conduit
+  ( ConduitM
+  , ConduitT
   , Flush (..)
   , Void
+  , await
   , mapOutput
   , runConduit
   , yield
+  , ($$+)
+  , ($$++)
   , (.|)
- )
+  )
 import Data.Conduit.Network (appSink, appSource)
 import Data.Default (Default (..))
+import Data.IORef (newIORef, readIORef, writeIORef)
+import Data.Int (Int64)
 import Data.Monoid ((<>))
-import Data.Streaming.Network (
-  ClientSettings
+import Data.Streaming.Network
+  ( ClientSettings
   , clientSettingsTCP
   , runTCPClient
- )
+  )
 import Data.String (IsString)
-import Network.HTTP.Client (
-  Manager
+import Network.HTTP.Client
+  ( BodyReader
+  , GivesPopper
+  , Manager
   , Request (..)
+  , RequestBody (..)
   , Response (..)
+  , brRead
   , parseRequest
   , withResponse
- )
-import Network.HTTP.Client.Conduit (bodyReaderSource)
-import Network.HTTP.Conduit (
-  requestBodySourceChunkedIO
-  , requestBodySourceIO
- )
-import Network.HTTP.Simple (Header)
-import Network.HTTP.Types (
-  HeaderName
+  )
+import Network.HTTP.Types
+  ( Header
+  , HeaderName
   , hContentType
   , internalServerError500
   , status304
   , status500
- )
+  )
 import Network.HTTP.Types.Header (hHost)
 import qualified Network.Wai as Wai
-import Network.Wai.Conduit (
-  responseRawSource
+import Network.Wai.Conduit
+  ( responseRawSource
   , responseSource
   , sourceRequestBody
- )
+  )
 
 
 {- | Type alias for a function that determines if a request should be handled by
@@ -180,9 +191,9 @@ simpleProxy settings manager req respond
               , requestBody =
                   case Wai.requestBodyLength req of
                     Wai.ChunkedBody ->
-                      requestBodySourceChunkedIO (sourceRequestBody req)
+                      requestBodySourceChunked (sourceRequestBody req)
                     Wai.KnownLength l ->
-                      requestBodySourceIO (fromIntegral l) (sourceRequestBody req)
+                      requestBodySource (fromIntegral l) (sourceRequestBody req)
               , -- don't modify the response to ensure consistency with the response headers
                 decompress = const False
               , host = newHost
@@ -230,3 +241,45 @@ dropUpstreamHeaders (k, _) = k `notElem` preservedHeaders
 
 preservedHeaders :: [HeaderName]
 preservedHeaders = ["content-encoding", "content-length", "host"]
+
+
+type Source' = ConduitT () ByteString IO ()
+
+
+srcToPopperIO :: Source' -> GivesPopper ()
+srcToPopperIO src f = do
+  (rsrc0, ()) <- src $$+ return ()
+  irsrc <- newIORef rsrc0
+  let popper :: IO ByteString
+      popper = do
+        rsrc <- readIORef irsrc
+        (rsrc', mres) <- rsrc $$++ await
+        writeIORef irsrc rsrc'
+        case mres of
+          Nothing -> return BS.empty
+          Just bs
+            | BS.null bs -> popper
+            | otherwise -> return bs
+  f popper
+
+
+requestBodySource :: Int64 -> Source' -> RequestBody
+requestBodySource size = RequestBodyStream size . srcToPopperIO
+
+
+requestBodySourceChunked :: Source' -> RequestBody
+requestBodySourceChunked = RequestBodyStreamChunked . srcToPopperIO
+
+
+bodyReaderSource ::
+  MonadIO m =>
+  BodyReader ->
+  ConduitT i ByteString m ()
+bodyReaderSource br =
+  loop
+  where
+    loop = do
+      bs <- liftIO $ brRead br
+      unless (BS.null bs) $ do
+        yield bs
+        loop

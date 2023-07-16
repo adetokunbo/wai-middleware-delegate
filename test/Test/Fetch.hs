@@ -1,29 +1,34 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Test.Fetch (
-  fetch
-) where
+module Test.Fetch
+  ( fetch
+  )
+where
 
-import Control.Monad.Trans.Resource (runResourceT)
+import Control.Monad (unless)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy as LBS
-import Data.Conduit (
-  ConduitT
+import Data.Conduit
+  ( ConduitT
   , SealedConduitT
   , Void
   , await
   , sealConduitT
+  , yield
   , ($$+-)
- )
+  )
 import qualified Data.Conduit.Binary as CB
 import Data.Int (Int64)
 import Data.Maybe (fromMaybe)
 import Network.Connection (TLSSettings (..))
-import Network.HTTP.Client (
-  Request
+import Network.HTTP.Client
+  ( BodyReader
+  , Request
+  , brRead
   , managerSetProxy
   , newManager
   , proxyFromRequest
@@ -31,9 +36,10 @@ import Network.HTTP.Client (
   , responseHeaders
   , responseStatus
   , secure
- )
+  , withResponse
+  )
 import Network.HTTP.Client.TLS (mkManagerSettings)
-import Network.HTTP.Simple (setRequestManager, withResponse)
+-- import Network.HTTP.Simple (setRequestManager, withResponse)
 import Network.HTTP.Types (hContentLength, statusCode)
 import Test.HttpReply
 
@@ -43,11 +49,11 @@ fetch req = do
   let mSettings = mkManagerSettings (TLSSettingsSimple True False False) Nothing
       mSettings' = managerSetProxy proxyFromRequest mSettings
   m <- newManager mSettings'
-  runResourceT $ withResponse (setRequestManager m req) getSrc
+  withResponse req m getSrc
   where
     getSrc resp = do
       let mbBodyLength = readInt64 <$> lookup hContentLength (responseHeaders resp)
-      bodyText <- checkBodySize (sealConduitT $ responseBody resp) mbBodyLength
+      bodyText <- checkBodySize (sealConduitT $ bodyReaderSource $ responseBody resp) mbBodyLength
       return $ HttpReply (secure req) (statusCode $ responseStatus resp) (responseHeaders resp) bodyText
 
 
@@ -86,3 +92,17 @@ sizeCheckSink expectedSize = sink 0
 
 readInt64 :: C8.ByteString -> Int64
 readInt64 = read . C8.unpack
+
+
+bodyReaderSource ::
+  MonadIO m =>
+  BodyReader ->
+  ConduitT i ByteString m ()
+bodyReaderSource br =
+  loop
+  where
+    loop = do
+      bs <- liftIO $ brRead br
+      unless (BS.null bs) $ do
+        yield bs
+        loop
