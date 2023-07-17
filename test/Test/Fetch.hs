@@ -71,7 +71,7 @@ checkBodySize bodySrc (Just len)
 -- A pipe that counts the size of each incoming C8.Bytestring, when the last is
 -- received, the result is Nothing if the size matches the expected value or an
 -- error message if it does not.
-sizeCheckSink :: Monad m => Int64 -> ConduitT C8.ByteString Void m (Maybe C8.ByteString)
+sizeCheckSink :: (Monad m) => Int64 -> ConduitT C8.ByteString Void m (Maybe C8.ByteString)
 sizeCheckSink expectedSize = sink 0
   where
     sink !count = await >>= maybe (closeSink count) (sinkBlock count)
@@ -95,7 +95,7 @@ readInt64 = read . C8.unpack
 
 
 bodyReaderSource ::
-  MonadIO m =>
+  (MonadIO m) =>
   BodyReader ->
   ConduitT i ByteString m ()
 bodyReaderSource br =

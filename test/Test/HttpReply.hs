@@ -1,13 +1,14 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Test.HttpReply (
-  HttpReply (..)
+module Test.HttpReply
+  ( HttpReply (..)
   , HttpReplyMismatch (..)
   , compareHttpReplies
   , assertHttpRepliesAreEq
   , assertHttpRepliesDiffer
-) where
+  )
+where
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS

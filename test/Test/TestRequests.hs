@@ -1,29 +1,30 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Test.TestRequests (
-  RequestBuilder (..)
+module Test.TestRequests
+  ( RequestBuilder (..)
   , buildRequest
   , testRequests
   , testGetRequests
   , testPostRequests
   , testNotProxiedRequests
   , testOverRedirectedRequests
-) where
+  )
+where
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import Data.Default (Default (..))
 import Data.Maybe (fromMaybe)
-import Network.HTTP.Client (
-  Request
+import Network.HTTP.Client
+  ( Request
   , RequestBody (..)
   , host
   , method
   , parseRequest
   , redirectCount
   , requestBody
- )
+  )
 import Network.HTTP.Types (Method, methodGet, methodPost)
 
 

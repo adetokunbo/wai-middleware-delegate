@@ -272,7 +272,7 @@ requestBodySourceChunked = RequestBodyStreamChunked . srcToPopperIO
 
 
 bodyReaderSource ::
-  MonadIO m =>
+  (MonadIO m) =>
   BodyReader ->
   ConduitT i ByteString m ()
 bodyReaderSource br =

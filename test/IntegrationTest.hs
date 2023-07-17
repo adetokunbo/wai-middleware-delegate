@@ -8,32 +8,32 @@ import Data.Default (Default (..))
 import Data.Foldable (for_)
 import Network.HTTP.Client.TLS (newTlsManager)
 import Network.HTTP.Types (status500)
-import Network.Wai (
-  Application
+import Network.Wai
+  ( Application
   , rawPathInfo
   , responseLBS
- )
+  )
 import Network.Wai.Handler.Warp (Port, testWithApplication)
-import Network.Wai.Middleware.Delegate (
-  ProxySettings (..)
+import Network.Wai.Middleware.Delegate
+  ( ProxySettings (..)
   , delegateToProxy
- )
+  )
 import System.Environment (lookupEnv)
 import System.IO
 import Test.Fetch (fetch)
 import Test.Hspec
 import Test.HttpReply
-import Test.TestRequests (
-  RequestBuilder (..)
+import Test.TestRequests
+  ( RequestBuilder (..)
   , buildRequest
   , testNotProxiedRequests
   , testOverRedirectedRequests
   , testRequests
- )
-import Test.WithExtras (
-  defaultTlsSettings
+  )
+import Test.WithExtras
+  ( defaultTlsSettings
   , testWithTLSApplication
- )
+  )
 
 
 defaultTestSettings :: ProxySettings

@@ -1,10 +1,11 @@
-module Test.WithExtras (
-  defaultTlsSettings
+module Test.WithExtras
+  ( defaultTlsSettings
   , testWithTLSApplication
   , testWithTLSApplicationSettings
   , withTLSApplication
   , withTLSApplicationSettings
-) where
+  )
+where
 
 import Control.Concurrent
 import Control.Concurrent.Async
@@ -12,19 +13,19 @@ import Control.Exception
 import Control.Monad (when)
 import Network.Socket (Socket, close)
 import Network.Wai (Application)
-import Network.Wai.Handler.Warp (
-  Port
+import Network.Wai.Handler.Warp
+  ( Port
   , Settings
   , defaultSettings
   , defaultShouldDisplayException
   , openFreePort
- )
+  )
 import Network.Wai.Handler.Warp.Internal (settingsBeforeMainLoop)
-import Network.Wai.Handler.WarpTLS (
-  TLSSettings
+import Network.Wai.Handler.WarpTLS
+  ( TLSSettings
   , runTLSSocket
   , tlsSettings
- )
+  )
 import Paths_wai_middleware_delegate (getDataFileName)
 
 
