@@ -13,6 +13,7 @@ in
       haskell-language-server = "latest";
       ghcid = "latest";
       fourmolu = "latest";
+      cabal-fmt = "latest";
     };
     # See overlays/tools.nix for more details
 

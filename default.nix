@@ -1,6 +1,6 @@
 let
-  # Pin haskell-nix to a recent (as of 2022/01/30) commit
-  h8x-pin = "https://github.com/input-output-hk/haskell.nix/archive/c2f14344f119f68c10be2ea84fd372d8d8d16cd7.tar.gz";
+  # Pin haskell-nix to a recent (as of 2023/06/16) commit
+  h8x-pin = "https://github.com/input-output-hk/haskell.nix/archive/67a7008a1561396a9662d0b47313760bb76cbe80.tar.gz";
   h8x-src = builtins.fetchTarball h8x-pin;
   h8x = import h8x-src {};
 
@@ -11,7 +11,7 @@ let
     # hence you will be more likely to get cache hits when using these. But you
     # can also just use your own, e.g. '<nixpkgs>'.
 
-    h8x.sources.nixpkgs-2111
+    h8x.sources.nixpkgs-2305
 
     # These arguments passed to nixpkgs, include some patches and also the
     # haskell.nix functionality itself as an overlay.
@@ -23,12 +23,11 @@ in pkgs.haskell-nix.cabalProject {
   src = pkgs.haskell-nix.haskellLib.cleanGit {
     name = "wai-middleware-delegate";
     src = ./.;
-
   };
 
   # Specify the GHC version to use.
-  compiler-nix-name = "ghc8107";
+  compiler-nix-name = "ghc928";
 
   # Specify the hackage index state
-  index-state = "2022-07-31T00:00:00Z";
+  index-state = "2023-07-16T00:00:00Z";
 }
