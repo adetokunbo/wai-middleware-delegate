@@ -75,6 +75,7 @@ test-suite integration-test
     , crypton-connection       >=0.3.1
     , data-default
     , hspec                    >=2.1
+    , hspec-tmp-proc
     , http-client
     , http-client-tls
     , http-types
@@ -82,6 +83,7 @@ test-suite integration-test
     , random                   >=1.1
     , resourcet
     , text
+    , tmp-proc                 >=0.5.2
     , vault
     , wai
     , wai-conduit
