@@ -2,6 +2,10 @@
 
 `wai-middleware-delegate` uses [PVP Versioning][1].
 
+## 0.1.4.1 -- 2024-03-17
+
+* Relax the upper bounds on bytestring to allow bytestring 0.12.1
+
 ## 0.1.4.0 -- 2023-17-11
 
 * Relax the upper bounds on bytestring to allow bytestring 0.12.1
