@@ -1,10 +1,14 @@
 let
   project = import ./default.nix {};
+  lib = pkgs.lib;
+  pkgs = project.pkgs;
 in
   project.shellFor {
     # Builds a Hoogle documentation index of all dependencies,
     # and provides a "hoogle" command to search the index.
     withHoogle = true;
+
+    packages = ps: lib.attrValues (pkgs.haskell-nix.haskellLib.selectProjectPackages ps);
 
     # Some common tools can be added with the `tools` argument
     tools = {
@@ -19,5 +23,5 @@ in
 
     # Prevents cabal from choosing alternate plans, so that
     # *all* dependencies are provided by Nix.
-    exactDeps = true;
+    # exactDeps = true;
   }

@@ -1,1 +1,18 @@
 packages: .
+
+tests: True
+
+source-repository-package
+  type: git
+  location: https://github.com/adetokunbo/tmp-proc.git
+  tag: 2cd5659280072d420dae1af59574cfba66776740
+  subdir: tmp-proc
+  --sha256: 02fwxf94y9p2qnc3h8frsgab1mcd2fbf5pmmxnrzc12b7060r0sa
+
+
+source-repository-package
+  type: git
+  location: https://github.com/adetokunbo/tmp-proc.git
+  tag: 2cd5659280072d420dae1af59574cfba66776740
+  subdir: hspec-tmp-proc
+  --sha256: 02fwxf94y9p2qnc3h8frsgab1mcd2fbf5pmmxnrzc12b7060r0sa
