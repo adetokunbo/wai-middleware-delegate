@@ -1,6 +1,7 @@
 packages: .
 
 tests: True
+test-show-details: streaming
 
 source-repository-package
   type: git
