@@ -23,8 +23,7 @@ bug-reports:
 build-type:         Simple
 extra-source-files: ChangeLog.md
 data-files:
-  test/*.csr
-  test/*.pem
+  templates/*.mustache
 
 source-repository head
   type:     git
