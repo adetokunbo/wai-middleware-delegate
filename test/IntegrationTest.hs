@@ -11,12 +11,12 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
 import Data.Default (Default (..))
 import Data.Foldable (for_)
+import Data.Maybe (isJust)
 import Data.Proxy (Proxy (..))
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Text.Encoding (encodeUtf8)
 import qualified Network.HTTP.Client as HC
-import Network.HTTP.Client.TLS (newTlsManager)
 import Network.HTTP.Types (status500, statusCode)
 import Network.Wai
   ( Application
@@ -53,7 +53,7 @@ import Test.Hspec.TmpProc
   )
 import qualified Test.Hspec.TmpProc as TmpProc
 import Test.HttpReply
-import Test.NginxTest (NginxTest (..))
+import Test.NginxGateway (NginxGateway (..), mkBadTlsManager)
 import Test.TestRequests
   ( RequestBuilder (..)
   , buildRequest
@@ -79,15 +79,13 @@ main :: IO ()
 main = do
   hSetBuffering stdin NoBuffering
   hSetBuffering stdout NoBuffering
-  dumpDebug' <- lookupEnv "DEBUG"
-  let dumpDebug = maybe False (const True) dumpDebug'
-  hspec $ tdescribe "when accessing http-bin in docker" $ do
-    -- TODO: reenable when a secure proxy is added to the docker tests
-    -- secureProxyTest dumpDebug
-    secureNotProxiedTest dumpDebug
+  dumpDebug <- isJust <$> lookupEnv "DEBUG"
+  hspec $ tdescribe "accessing http-bin in docker" $ do
     insecureRedirectTest dumpDebug
     insecureNotProxiedTest dumpDebug
     insecureProxyTest dumpDebug
+    secureNotProxiedTest dumpDebug
+    secureProxyTest dumpDebug
 
 
 defaultTestDelegate :: ProxySettings -> IO Application
@@ -95,8 +93,7 @@ defaultTestDelegate s = do
   -- delegate everything but /status/418
   let handleFunnyStatus req = rawPathInfo req /= "/status/418"
       dummyApp _ respond = respond $ responseLBS status500 [] "I should have been proxied"
-
-  manager <- newTlsManager
+  manager <- mkBadTlsManager
   return $ delegateToProxy s manager handleFunnyStatus dummyApp
 
 
@@ -230,20 +227,20 @@ secureProxyTest debug =
           it (scheme ++ " " ++ title) shouldMatch
 
 
-type ReverseProxyFixture = HandlesOf '[NginxTest, HttpBin]
+type ReverseProxyFixture = HandlesOf '[NginxGateway, HttpBin]
 
 
-anNginxTest :: NginxTest
-anNginxTest =
-  NginxTest
-    { ntCommonName = "localhost"
-    , ntTargetPort = 80
-    , ntTargetName = "http-bin-test"
+aGateway :: NginxGateway
+aGateway =
+  NginxGateway
+    { ngCommonName = "localhost"
+    , ngTargetPort = 80
+    , ngTargetName = "tmp-http-bin"
     }
 
 
-nginxAndHttpBin :: HList '[NginxTest, HttpBin]
-nginxAndHttpBin = anNginxTest &:& HttpBin
+nginxAndHttpBin :: HList '[NginxGateway, HttpBin]
+nginxAndHttpBin = aGateway &:& HttpBin
 
 
 setupReverseProxy :: IO ReverseProxyFixture

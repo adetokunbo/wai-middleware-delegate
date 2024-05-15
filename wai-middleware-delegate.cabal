@@ -60,7 +60,7 @@ test-suite integration-test
     Paths_wai_middleware_delegate
     Test.Fetch
     Test.HttpReply
-    Test.NginxTest
+    Test.NginxGateway
     Test.TestRequests
     Test.WithExtras
 

@@ -6,18 +6,21 @@
 {-# LANGUAGE TypeFamilies #-}
 
 {- |
-Module      : Test.NginxTest
+Module      : Test.NginxGateway
 Copyright   : (c) 2022 Tim Emiola
 Maintainer  : Tim Emiola <adetokunbo@emio.la>
 SPDX-License-Identifier: BSD3
 -}
-module Test.NginxTest
+module Test.NginxGateway
   ( -- * data types
-    NginxTest (..)
+    NginxGateway (..)
   , NginxPrep (..)
 
     -- * ping via https
   , pingHttps
+
+    -- * a TLS manager that ignores errors
+  , mkBadTlsManager
   )
 where
 
@@ -60,45 +63,47 @@ import Text.Mustache
 
 
 -- | Run Nginx as a temporary process.
-instance Proc NginxTest where
+instance Proc NginxGateway where
   -- use this linuxserver.io nginx as it is setup to allow easy override of
   -- config
-  type Image NginxTest = "lscr.io/linuxserver/nginx"
-  type Name NginxTest = "nginx-test"
+  type Image NginxGateway = "lscr.io/linuxserver/nginx"
+  type Name NginxGateway = "nginx-test"
   uriOf = httpUri
   runArgs = []
   reset _ = pure ()
   ping = pingHttps
 
 
-instance ToRunCmd NginxTest NginxPrep where
+instance ToRunCmd NginxGateway NginxPrep where
   toRunCmd = toRunCmd'
 
 
-instance Preparer NginxTest NginxPrep where
+instance Preparer NginxGateway NginxPrep where
   prepare = prepare'
   tidy = tidy'
 
 
--- | Configures launch of a container thats uses nginx as a reverse proxy.
-data NginxTest = NginxTest
-  { ntCommonName :: !Text
-  , ntTargetPort :: !Int
-  , ntTargetName :: !Text
+{- | Configures launch of a container thats uses nginx as a gateway (a.k.a
+reverse proxy).
+-}
+data NginxGateway = NginxGateway
+  { ngCommonName :: !Text
+  , ngTargetPort :: !Int
+  , ngTargetName :: !Text
   }
   deriving (Eq, Show)
 
 
-instance ToMustache NginxTest where
+instance ToMustache NginxGateway where
   toMustache nt =
     object
-      [ "commonName" ~> ntCommonName nt
-      , "targetPort" ~> ntTargetPort nt
-      , "targetName" ~> ntTargetName nt
+      [ "commonName" ~> ngCommonName nt
+      , "targetPort" ~> ngTargetPort nt
+      , "targetName" ~> ngTargetName nt
       ]
 
 
--- | Values obtained while in preparation to launch the nginx container
+-- | Values obtained while preparing to launch the nginx container
 data NginxPrep = NginxPrep
   { npUserID :: !UserID
   , npGroupID :: !GroupID
@@ -140,11 +145,11 @@ createWorkingDirs = do
   pure topDir
 
 
-tidy' :: NginxTest -> NginxPrep -> IO ()
+tidy' :: NginxGateway -> NginxPrep -> IO ()
 tidy' _ np = removeDirectoryRecursive $ npVolumeRoot np
 
 
-toRunCmd' :: NginxTest -> NginxPrep -> [Text]
+toRunCmd' :: NginxGateway -> NginxPrep -> [Text]
 toRunCmd' _ np =
   -- specify user ID and group ID to fix volume mount permissions
   -- mount volume /etc/tmp-proc/certs as target-dir/certs
@@ -166,37 +171,34 @@ toRunCmd' _ np =
    in Text.pack <$> confArg ++ certsArg ++ puidArg ++ guidArg
 
 
-ifHasHandle :: [SlimHandle] -> Text -> (SlimHandle -> IO a) -> IO a
-ifHasHandle hs name action = case find ((== name) . shName) hs of
-  Nothing -> error $ "could not find host " <> show name
-  Just sh -> action sh
-
-
 -- Prepare
 -- expand the template with commonName to target-dir/nginx
 -- create certs with commonName to target-dir/certs
 -- used fixed cert basenames (certificate.pem and key.pem)
-prepare' :: [SlimHandle] -> NginxTest -> IO NginxPrep
-prepare' hs nt@NginxTest {ntTargetName = name} = ifHasHandle hs name $ \_ -> do
-  templateDir <- (</> "templates") <$> getDataDir
-  compiled <- automaticCompile [templateDir] templateName
-  case compiled of
-    Left err -> error $ "the template did not compile:" ++ show err
-    Right template -> do
-      npVolumeRoot <- createWorkingDirs
-      npUserID <- getEffectiveUserID
-      npGroupID <- getEffectiveGroupID
-      let (confDir, cpDir) = toConfCertsDirs npVolumeRoot
-          cp =
-            CertPaths
-              { cpKey = "key.pem"
-              , cpCert = "certificate.pem"
-              , cpDir
-              }
-          np = NginxPrep {npUserID, npGroupID, npVolumeRoot}
-      generateAndStore cp defaultConfig
-      Text.writeFile (confDir </> "nginx.conf") $ substitute template (nt, np)
-      pure np
+prepare' :: [SlimHandle] -> NginxGateway -> IO NginxPrep
+prepare' views nt@NginxGateway {ngTargetName = name} = do
+  case find ((== name) . shName) views of
+    Nothing -> error $ "could not find host " <> show name
+    Just _ -> do
+      templateDir <- (</> "templates") <$> getDataDir
+      compiled <- automaticCompile [templateDir] templateName
+      case compiled of
+        Left err -> error $ "the template did not compile:" ++ show err
+        Right template -> do
+          npVolumeRoot <- createWorkingDirs
+          npUserID <- getEffectiveUserID
+          npGroupID <- getEffectiveGroupID
+          let (confDir, cpDir) = toConfCertsDirs npVolumeRoot
+              cp =
+                CertPaths
+                  { cpKey = "key.pem"
+                  , cpCert = "certificate.pem"
+                  , cpDir
+                  }
+              np = NginxPrep {npUserID, npGroupID, npVolumeRoot}
+          generateAndStore cp defaultConfig
+          Text.writeFile (confDir </> "nginx.conf") $ substitute template (nt, np)
+          pure np
 
 
 -- | Make a uri access the http-bin server.
@@ -210,12 +212,21 @@ pingHttps handle = toPinged @HC.HttpException Proxy $ do
   if gotStatus == 200 then pure OK else pure NotOK
 
 
+-- use TLS settings that disable hostname verification. What's not
+-- currently possible is to actually specify the hostname to use for SNI
+-- that differs from the connection IP address, that's not supported by
+-- http-client-tls
+mkBadTlsManager :: IO HC.Manager
+mkBadTlsManager = do
+  let tlsSettings = TLSSettingsSimple True False False
+  HC.newTlsManagerWith $ HC.mkManagerSettings tlsSettings Nothing
+
+
 -- | Determine the status from a secure Get to host localhost.
 httpsGet :: ProcHandle a -> Text -> IO Int
 httpsGet handle urlPath = do
   let theUri = "https://" <> hAddr handle <> "/" <> Text.dropWhile (== '/') urlPath
-      tlsSettings = TLSSettingsSimple True False False
-  manager <- HC.newTlsManagerWith $ HC.mkManagerSettings tlsSettings Nothing
+  manager <- mkBadTlsManager
   getReq <- HC.parseRequest $ Text.unpack theUri
   let withHost = getReq {HC.requestHeaders = [(hHost, "localhost")]}
   statusCode . HC.responseStatus <$> HC.httpLbs withHost manager
