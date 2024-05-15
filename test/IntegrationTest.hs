@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -12,12 +11,12 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
 import Data.Default (Default (..))
 import Data.Foldable (for_)
+import Data.Maybe (isJust)
 import Data.Proxy (Proxy (..))
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Text.Encoding (encodeUtf8)
 import qualified Network.HTTP.Client as HC
-import Network.HTTP.Client.TLS (newTlsManager)
 import Network.HTTP.Types (status500, statusCode)
 import Network.Wai
   ( Application
@@ -25,16 +24,19 @@ import Network.Wai
   , responseLBS
   )
 import Network.Wai.Handler.Warp (Port, testWithApplication)
+import Network.Wai.Handler.WarpTLS (tlsSettings)
 import Network.Wai.Middleware.Delegate
   ( ProxySettings (..)
   , delegateToProxy
   )
 import System.Environment (lookupEnv)
 import System.IO
+import Test.Certs.Temp (certificatePath, keyPath, withCertPathsInTmp')
 import Test.Fetch (fetch)
 import Test.Hspec
 import Test.Hspec.TmpProc
   ( HList (..)
+  , HandlesOf
   , HostIpAddress
   , Pinged (..)
   , Proc (..)
@@ -47,19 +49,17 @@ import Test.Hspec.TmpProc
   , terminateAll
   , toPinged
   , (&:)
+  , (&:&)
   )
 import qualified Test.Hspec.TmpProc as TmpProc
 import Test.HttpReply
+import Test.NginxGateway (NginxGateway (..), mkBadTlsManager)
 import Test.TestRequests
   ( RequestBuilder (..)
   , buildRequest
   , testNotProxiedRequests
   , testOverRedirectedRequests
   , testRequests
-  )
-import Test.WithExtras
-  ( defaultTlsSettings
-  , testWithTLSApplication
   )
 
 
@@ -79,15 +79,13 @@ main :: IO ()
 main = do
   hSetBuffering stdin NoBuffering
   hSetBuffering stdout NoBuffering
-  dumpDebug' <- lookupEnv "DEBUG"
-  let dumpDebug = maybe False (const True) dumpDebug'
-  hspec $ tdescribe "when accessing http-bin in docker" $ do
-    -- TODO: reenable when a secure proxy is added to the docker tests
-    -- secureProxyTest dumpDebug
-    -- secureNotProxiedTest dumpDebug
+  dumpDebug <- isJust <$> lookupEnv "DEBUG"
+  hspec $ tdescribe "accessing http-bin in docker" $ do
     insecureRedirectTest dumpDebug
     insecureNotProxiedTest dumpDebug
     insecureProxyTest dumpDebug
+    secureNotProxiedTest dumpDebug
+    secureProxyTest dumpDebug
 
 
 defaultTestDelegate :: ProxySettings -> IO Application
@@ -95,49 +93,54 @@ defaultTestDelegate s = do
   -- delegate everything but /status/418
   let handleFunnyStatus req = rawPathInfo req /= "/status/418"
       dummyApp _ respond = respond $ responseLBS status500 [] "I should have been proxied"
-
-  manager <- newTlsManager
+  manager <- mkBadTlsManager
   return $ delegateToProxy s manager handleFunnyStatus dummyApp
 
 
-toHost :: HttpBinFixture -> ByteString
-toHost fixture = encodeUtf8 $ hAddr $ handleOf @"tmp-http-bin" Proxy fixture
+httpBinHost :: HttpBinFixture -> ByteString
+httpBinHost fixture = encodeUtf8 $ hAddr $ handleOf @"tmp-http-bin" Proxy fixture
 
 
-fixtureApp :: HttpBinFixture -> IO Application
-fixtureApp fixture = defaultTestDelegate $ tmpHostSettings (toHost fixture) defaultTestSettings
+nginxHost :: ReverseProxyFixture -> ByteString
+nginxHost fixture = encodeUtf8 $ hAddr $ handleOf @"nginx-test" Proxy fixture
 
 
 redirectApp :: HttpBinFixture -> IO Application
-redirectApp fixture = defaultTestDelegate $ tmpHostSettings (toHost fixture) redirectTestSettings
+redirectApp fixture = defaultTestDelegate $ tmpHostSettings (httpBinHost fixture) redirectTestSettings
 
 
 testWithInsecureProxy' :: ((HttpBinFixture, Port) -> IO a) -> IO a
-testWithInsecureProxy' = TmpProc.testWithApplication onlyHttpBin fixtureApp
+testWithInsecureProxy' = TmpProc.testWithApplication onlyHttpBin httpBinApp
 
 
-testWithSecureProxy' :: ((HttpBinFixture, Port) -> IO a) -> IO a
-testWithSecureProxy' action = do
-  tls <- defaultTlsSettings
-  TmpProc.testWithTLSApplication tls onlyHttpBin fixtureApp action
+httpBinApp :: HttpBinFixture -> IO Application
+httpBinApp fixture = defaultTestDelegate $ tmpHostSettings (httpBinHost fixture) defaultTestSettings
+
+
+nginxApp :: ReverseProxyFixture -> IO Application
+nginxApp fixture = defaultTestDelegate $ tmpHostSettings (nginxHost fixture) defaultTestSettings
+
+
+testWithSecureProxy' :: ((ReverseProxyFixture, Port) -> IO a) -> IO a
+testWithSecureProxy' action = withCertPathsInTmp' $ \cp -> do
+  let tls = tlsSettings (certificatePath cp) (keyPath cp)
+  TmpProc.testWithTLSApplication tls nginxAndHttpBin nginxApp action
 
 
 testWithInsecureProxy :: (Port -> IO ()) -> IO ()
 testWithInsecureProxy = testWithApplication (defaultTestDelegate defaultTestSettings)
 
 
-testWithSecureProxy :: (Port -> IO ()) -> IO ()
-testWithSecureProxy withPort = do
-  tls <- defaultTlsSettings
-  testWithTLSApplication tls (defaultTestDelegate defaultTestSettings) withPort
-
-
 testWithInsecureRedirects' :: ((HttpBinFixture, Port) -> IO ()) -> IO ()
 testWithInsecureRedirects' = TmpProc.testWithApplication onlyHttpBin redirectApp
 
 
-tmpHostBuilder :: HttpBinFixture -> RequestBuilder -> RequestBuilder
-tmpHostBuilder fixture builder = builder {rbHost = toHost fixture}
+httpBinHostBuilder :: HttpBinFixture -> RequestBuilder -> RequestBuilder
+httpBinHostBuilder fixture builder = builder {rbHost = httpBinHost fixture}
+
+
+nginxHostBuilder :: ReverseProxyFixture -> RequestBuilder -> RequestBuilder
+nginxHostBuilder fixture builder = builder {rbHost = nginxHost fixture}
 
 
 onDirectAndProxy :: (HttpReply -> HttpReply -> IO ()) -> Bool -> Int -> RequestBuilder -> IO ()
@@ -174,7 +177,7 @@ insecureNotProxiedTest debug =
       assertNeq = onDirectAndProxy assertHttpRepliesDiffer debug
    in aroundAll testWithInsecureProxy' $ describe desc $ do
         for_ testNotProxiedRequests $ \(title, modifier) -> do
-          let shouldNotMatch (f, p) = assertNeq p $ modifier $ tmpHostBuilder f def
+          let shouldNotMatch (f, p) = assertNeq p $ modifier $ httpBinHostBuilder f def
           it (scheme ++ " " ++ title) shouldNotMatch
 
 
@@ -185,7 +188,7 @@ insecureRedirectTest debug =
       assertNeq = onDirectAndProxy assertHttpRepliesDiffer debug
    in aroundAll testWithInsecureRedirects' $ describe desc $ do
         for_ testOverRedirectedRequests $ \(title, modifier) -> do
-          let shouldNotMatch (f, p) = assertNeq p $ modifier $ tmpHostBuilder f def
+          let shouldNotMatch (f, p) = assertNeq p $ modifier $ httpBinHostBuilder f def
           it (scheme ++ " " ++ title) shouldNotMatch
 
 
@@ -196,7 +199,7 @@ insecureProxyTest debug =
       assertEq = onDirectAndProxy assertHttpRepliesAreEq debug
    in aroundAll testWithInsecureProxy' $ describe desc $ do
         for_ testRequests $ \(title, modifier) -> do
-          let shouldMatch (f, p) = assertEq p $ modifier $ tmpHostBuilder f def
+          let shouldMatch (f, p) = assertEq p $ modifier $ httpBinHostBuilder f def
           it (scheme ++ " " ++ title) shouldMatch
 
 
@@ -208,7 +211,7 @@ secureNotProxiedTest debug =
       def' = def {rbSecure = True}
    in aroundAll testWithSecureProxy' $ describe desc $ do
         for_ testNotProxiedRequests $ \(title, modifier) -> do
-          let shouldNotMatch (f, p) = assertNeq p $ modifier $ tmpHostBuilder f def'
+          let shouldNotMatch (f, p) = assertNeq p $ modifier $ nginxHostBuilder f def'
           it (scheme ++ " " ++ title) shouldNotMatch
 
 
@@ -220,15 +223,39 @@ secureProxyTest debug =
       def' = def {rbSecure = True}
    in aroundAll testWithSecureProxy' $ describe desc $ do
         for_ testRequests $ \(title, modifier) -> do
-          let shouldMatch (f, p) = assertEq p $ modifier $ tmpHostBuilder f def'
+          let shouldMatch (f, p) = assertEq p $ modifier $ nginxHostBuilder f def'
           it (scheme ++ " " ++ title) shouldMatch
+
+
+type ReverseProxyFixture = HandlesOf '[NginxGateway, HttpBin]
+
+
+aGateway :: NginxGateway
+aGateway =
+  NginxGateway
+    { ngCommonName = "localhost"
+    , ngTargetPort = 80
+    , ngTargetName = "tmp-http-bin"
+    }
+
+
+nginxAndHttpBin :: HList '[NginxGateway, HttpBin]
+nginxAndHttpBin = aGateway &:& HttpBin
+
+
+setupReverseProxy :: IO ReverseProxyFixture
+setupReverseProxy = startupAll nginxAndHttpBin
+
+
+withReverseProxy :: SpecWith ReverseProxyFixture -> Spec
+withReverseProxy = beforeAll setupReverseProxy . afterAll terminateAll
 
 
 -- | A data type representing a connection to a HttpBin server.
 data HttpBin = HttpBin
 
 
-type HttpBinFixture = HList '[ProcHandle HttpBin]
+type HttpBinFixture = HandlesOf '[HttpBin]
 
 
 onlyHttpBin :: HList '[HttpBin]
