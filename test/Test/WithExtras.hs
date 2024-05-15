@@ -1,6 +1,5 @@
 module Test.WithExtras
-  ( defaultTlsSettings
-  , testWithTLSApplication
+  ( testWithTLSApplication
   , testWithTLSApplicationSettings
   , withTLSApplication
   , withTLSApplicationSettings
@@ -22,34 +21,31 @@ import Network.Wai.Handler.Warp
   )
 import Network.Wai.Handler.Warp.Internal (settingsBeforeMainLoop)
 import Network.Wai.Handler.WarpTLS
-  ( TLSSettings
-  , runTLSSocket
+  ( runTLSSocket
   , tlsSettings
   )
-import Paths_wai_middleware_delegate (getDataFileName)
+import Test.Certs.Temp (certificatePath, keyPath, withCertPathsInTmp')
 
 
--- | The settings used in the integration tests
-defaultTlsSettings :: IO TLSSettings
-defaultTlsSettings =
-  tlsSettings
-    <$> (getDataFileName "test/certificate.pem")
-    <*> (getDataFileName "test/key.pem")
+runTLSSocket' :: Settings -> Socket -> Application -> IO ()
+runTLSSocket' settings sock app = withCertPathsInTmp' $ \cp -> do
+  let tls = tlsSettings (certificatePath cp) (keyPath cp)
+  runTLSSocket tls settings sock app
 
 
 {- | Runs the given 'Application' on a free port. Passes the port to the given
  operation and executes it, while the 'Application' is running. Shuts down the
  server before returning.
 -}
-withTLSApplication :: TLSSettings -> IO Application -> (Port -> IO a) -> IO a
+withTLSApplication :: IO Application -> (Port -> IO a) -> IO a
 withTLSApplication = withTLSApplicationSettings defaultSettings
 
 
 {- | 'withTLSApplication' with given 'Settings'. This will ignore the port value
  set by 'setPort' in 'Settings'.
 -}
-withTLSApplicationSettings :: Settings -> TLSSettings -> IO Application -> (Port -> IO a) -> IO a
-withTLSApplicationSettings settings' tlsSettings' mkApp action = do
+withTLSApplicationSettings :: Settings -> IO Application -> (Port -> IO a) -> IO a
+withTLSApplicationSettings settings' mkApp action = do
   app <- mkApp
   withFreePort $ \(port, sock) -> do
     started <- mkWaiter
@@ -60,19 +56,19 @@ withTLSApplicationSettings settings' tlsSettings' mkApp action = do
             }
     result <-
       race
-        (runTLSSocket tlsSettings' settings sock app)
+        (runTLSSocket' settings sock app)
         (waitFor started >> action port)
     case result of
       Left () -> throwIO $ ErrorCall "Unexpected: runSettingsSocket exited"
       Right x -> return x
 
 
-testWithTLSApplication :: TLSSettings -> IO Application -> (Port -> IO a) -> IO a
+testWithTLSApplication :: IO Application -> (Port -> IO a) -> IO a
 testWithTLSApplication = testWithTLSApplicationSettings defaultSettings
 
 
-testWithTLSApplicationSettings :: Settings -> TLSSettings -> IO Application -> (Port -> IO a) -> IO a
-testWithTLSApplicationSettings settings tlsSettings' mkApp action = do
+testWithTLSApplicationSettings :: Settings -> IO Application -> (Port -> IO a) -> IO a
+testWithTLSApplicationSettings settings mkApp action = do
   callingThread <- myThreadId
   app <- mkApp
   let wrappedApp request respond =
@@ -81,7 +77,7 @@ testWithTLSApplicationSettings settings tlsSettings' mkApp action = do
             (defaultShouldDisplayException e)
             (throwTo callingThread e)
           throwIO e
-  withTLSApplicationSettings settings tlsSettings' (return wrappedApp) action
+  withTLSApplicationSettings settings (return wrappedApp) action
 
 
 data Waiter a = Waiter
