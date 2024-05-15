@@ -57,6 +57,8 @@ import Test.NginxGateway (NginxGateway (..), mkBadTlsManager)
 import Test.TestRequests
   ( RequestBuilder (..)
   , buildRequest
+  , nil
+  , secure
   , testNotProxiedRequests
   , testOverRedirectedRequests
   , testRequests
@@ -177,7 +179,7 @@ insecureNotProxiedTest debug =
       assertNeq = onDirectAndProxy assertHttpRepliesDiffer debug
    in aroundAll testWithInsecureProxy' $ describe desc $ do
         for_ testNotProxiedRequests $ \(title, modifier) -> do
-          let shouldNotMatch (f, p) = assertNeq p $ modifier $ httpBinHostBuilder f def
+          let shouldNotMatch (f, p) = assertNeq p $ modifier $ httpBinHostBuilder f nil
           it (scheme ++ " " ++ title) shouldNotMatch
 
 
@@ -188,7 +190,7 @@ insecureRedirectTest debug =
       assertNeq = onDirectAndProxy assertHttpRepliesDiffer debug
    in aroundAll testWithInsecureRedirects' $ describe desc $ do
         for_ testOverRedirectedRequests $ \(title, modifier) -> do
-          let shouldNotMatch (f, p) = assertNeq p $ modifier $ httpBinHostBuilder f def
+          let shouldNotMatch (f, p) = assertNeq p $ modifier $ httpBinHostBuilder f nil
           it (scheme ++ " " ++ title) shouldNotMatch
 
 
@@ -199,7 +201,7 @@ insecureProxyTest debug =
       assertEq = onDirectAndProxy assertHttpRepliesAreEq debug
    in aroundAll testWithInsecureProxy' $ describe desc $ do
         for_ testRequests $ \(title, modifier) -> do
-          let shouldMatch (f, p) = assertEq p $ modifier $ httpBinHostBuilder f def
+          let shouldMatch (f, p) = assertEq p $ modifier $ httpBinHostBuilder f nil
           it (scheme ++ " " ++ title) shouldMatch
 
 
@@ -208,24 +210,32 @@ secureNotProxiedTest debug =
   let scheme = "HTTPS"
       desc = "Proxy on " ++ scheme ++ " should fail"
       assertNeq = onDirectAndProxy assertHttpRepliesDiffer debug
-      def' = def {rbSecure = True}
    in aroundAll testWithSecureProxy' $ describe desc $ do
         for_ testNotProxiedRequests $ \(title, modifier) -> do
-          let shouldNotMatch (f, p) = assertNeq p $ modifier $ nginxHostBuilder f def'
+          let shouldNotMatch (f, p) = assertNeq p $ modifier $ nginxHostBuilder f sNil
           it (scheme ++ " " ++ title) shouldNotMatch
 
+
+sNil :: RequestBuilder
+sNil = secure nil
+
+
+-- let shouldNotMatch (f, p) = assertNeq p $ modifier $ tmpHostBuilder f def'
+-- it (scheme ++ " " ++ title) shouldNotMatch
 
 secureProxyTest :: Bool -> Spec
 secureProxyTest debug =
   let scheme = "HTTPS"
       desc = "Simple " ++ scheme ++ " proxying:"
       assertEq = onDirectAndProxy assertHttpRepliesAreEq debug
-      def' = def {rbSecure = True}
    in aroundAll testWithSecureProxy' $ describe desc $ do
         for_ testRequests $ \(title, modifier) -> do
-          let shouldMatch (f, p) = assertEq p $ modifier $ nginxHostBuilder f def'
+          let shouldMatch (f, p) = assertEq p $ modifier $ nginxHostBuilder f sNil
           it (scheme ++ " " ++ title) shouldMatch
 
+
+-- let shouldMatch (f, p) = assertEq p $ modifier $ tmpHostBuilder f def'
+-- it (scheme ++ " " ++ title) shouldMatch
 
 type ReverseProxyFixture = HandlesOf '[NginxGateway, HttpBin]
 
