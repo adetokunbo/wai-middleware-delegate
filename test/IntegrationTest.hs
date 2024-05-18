@@ -1,4 +1,7 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -6,7 +9,7 @@
 
 module Main where
 
-import Control.Monad (when)
+import Control.Monad (forM_, when)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
 import Data.Default (Default (..))
@@ -23,7 +26,7 @@ import Network.Wai
   , rawPathInfo
   , responseLBS
   )
-import Network.Wai.Handler.Warp (Port, testWithApplication)
+import Network.Wai.Handler.Warp (Port)
 import Network.Wai.Handler.WarpTLS (tlsSettings)
 import Network.Wai.Middleware.Delegate
   ( ProxySettings (..)
@@ -44,9 +47,7 @@ import Test.Hspec.TmpProc
   , SvcURI
   , hAddr
   , handleOf
-  , startupAll
   , tdescribe
-  , terminateAll
   , toPinged
   , (&:)
   , (&:&)
@@ -73,8 +74,8 @@ redirectTestSettings :: ProxySettings
 redirectTestSettings = defaultTestSettings {proxyRedirectCount = 2}
 
 
-tmpHostSettings :: ByteString -> ProxySettings -> ProxySettings
-tmpHostSettings tmpHost settings = settings {proxyHost = tmpHost}
+setProxyHost :: ByteString -> ProxySettings -> ProxySettings
+setProxyHost proxyHost ps = ps {proxyHost}
 
 
 main :: IO ()
@@ -83,15 +84,12 @@ main = do
   hSetBuffering stdout NoBuffering
   dumpDebug <- isJust <$> lookupEnv "DEBUG"
   hspec $ tdescribe "accessing http-bin in docker" $ do
-    insecureRedirectTest dumpDebug
-    insecureNotProxiedTest dumpDebug
-    insecureProxyTest dumpDebug
-    secureNotProxiedTest dumpDebug
-    secureProxyTest dumpDebug
+    forM_ insecureRequestSpecs $ flip insecureRequestSpecsTest dumpDebug
+    forM_ secureRequestSpecs $ flip secureRequestSpecsTest dumpDebug
 
 
-defaultTestDelegate :: ProxySettings -> IO Application
-defaultTestDelegate s = do
+mkSampleApp :: ProxySettings -> IO Application
+mkSampleApp s = do
   -- delegate everything but /status/418
   let handleFunnyStatus req = rawPathInfo req /= "/status/418"
       dummyApp _ respond = respond $ responseLBS status500 [] "I should have been proxied"
@@ -99,50 +97,15 @@ defaultTestDelegate s = do
   return $ delegateToProxy s manager handleFunnyStatus dummyApp
 
 
-httpBinHost :: HttpBinFixture -> ByteString
-httpBinHost fixture = encodeUtf8 $ hAddr $ handleOf @"tmp-http-bin" Proxy fixture
+mkSampleApp' :: (HostOf a) => ProxySettings -> HandlesOf a -> IO Application
+mkSampleApp' settings f = mkSampleApp $ setProxyHost (hostOf f) settings
 
 
-nginxHost :: ReverseProxyFixture -> ByteString
-nginxHost fixture = encodeUtf8 $ hAddr $ handleOf @"nginx-test" Proxy fixture
-
-
-redirectApp :: HttpBinFixture -> IO Application
-redirectApp fixture = defaultTestDelegate $ tmpHostSettings (httpBinHost fixture) redirectTestSettings
-
-
-testWithInsecureProxy' :: ((HttpBinFixture, Port) -> IO a) -> IO a
-testWithInsecureProxy' = TmpProc.testWithApplication onlyHttpBin httpBinApp
-
-
-httpBinApp :: HttpBinFixture -> IO Application
-httpBinApp fixture = defaultTestDelegate $ tmpHostSettings (httpBinHost fixture) defaultTestSettings
-
-
-nginxApp :: ReverseProxyFixture -> IO Application
-nginxApp fixture = defaultTestDelegate $ tmpHostSettings (nginxHost fixture) defaultTestSettings
-
-
-testWithSecureProxy' :: ((ReverseProxyFixture, Port) -> IO a) -> IO a
-testWithSecureProxy' action = withCertPathsInTmp' $ \cp -> do
+testWithSecureProxy :: ((ReverseProxyFixture, Port) -> IO a) -> IO a
+testWithSecureProxy action = withCertPathsInTmp' $ \cp -> do
   let tls = tlsSettings (certificatePath cp) (keyPath cp)
-  TmpProc.testWithTLSApplication tls nginxAndHttpBin nginxApp action
-
-
-testWithInsecureProxy :: (Port -> IO ()) -> IO ()
-testWithInsecureProxy = testWithApplication (defaultTestDelegate defaultTestSettings)
-
-
-testWithInsecureRedirects' :: ((HttpBinFixture, Port) -> IO ()) -> IO ()
-testWithInsecureRedirects' = TmpProc.testWithApplication onlyHttpBin redirectApp
-
-
-httpBinHostBuilder :: HttpBinFixture -> RequestBuilder -> RequestBuilder
-httpBinHostBuilder fixture builder = builder {rbHost = httpBinHost fixture}
-
-
-nginxHostBuilder :: ReverseProxyFixture -> RequestBuilder -> RequestBuilder
-nginxHostBuilder fixture builder = builder {rbHost = nginxHost fixture}
+      app = mkSampleApp' defaultTestSettings
+  TmpProc.testWithTLSApplication tls nginxAndHttpBin app action
 
 
 onDirectAndProxy :: (HttpReply -> HttpReply -> IO ()) -> Bool -> Int -> RequestBuilder -> IO ()
@@ -172,70 +135,168 @@ onDirectAndProxy f debug testProxyPort builder = do
   f direct proxied
 
 
-insecureNotProxiedTest :: Bool -> Spec
-insecureNotProxiedTest debug =
-  let scheme = "HTTP"
-      desc = "Proxy on " ++ scheme ++ " should fail"
-      assertNeq = onDirectAndProxy assertHttpRepliesDiffer debug
-   in aroundAll testWithInsecureProxy' $ describe desc $ do
-        for_ testNotProxiedRequests $ \(title, modifier) -> do
-          let shouldNotMatch (f, p) = assertNeq p $ modifier $ httpBinHostBuilder f nil
-          it (scheme ++ " " ++ title) shouldNotMatch
+check ::
+  (HostOf a) =>
+  (HttpReply -> HttpReply -> IO ()) ->
+  (RequestBuilder -> RequestBuilder) ->
+  Bool ->
+  RequestBuilder ->
+  (HandlesOf a, Int) ->
+  IO ()
+check assertReplies modifier debug core (f, p) =
+  let
+    builder = modifier $ hostBuilder f core
+   in
+    onDirectAndProxy assertReplies debug p builder
 
 
-insecureRedirectTest :: Bool -> Spec
-insecureRedirectTest debug =
-  let scheme = "HTTP"
-      desc = "Proxy over " ++ scheme ++ " with too many redirects differs"
-      assertNeq = onDirectAndProxy assertHttpRepliesDiffer debug
-   in aroundAll testWithInsecureRedirects' $ describe desc $ do
-        for_ testOverRedirectedRequests $ \(title, modifier) -> do
-          let shouldNotMatch (f, p) = assertNeq p $ modifier $ httpBinHostBuilder f nil
-          it (scheme ++ " " ++ title) shouldNotMatch
+type RequestSpecs = [(String, RequestBuilder -> RequestBuilder)]
 
 
-insecureProxyTest :: Bool -> Spec
-insecureProxyTest debug =
-  let scheme = "HTTP"
-      desc = "Simple " ++ scheme ++ " proxying:"
-      assertEq = onDirectAndProxy assertHttpRepliesAreEq debug
-   in aroundAll testWithInsecureProxy' $ describe desc $ do
-        for_ testRequests $ \(title, modifier) -> do
-          let shouldMatch (f, p) = assertEq p $ modifier $ httpBinHostBuilder f nil
-          it (scheme ++ " " ++ title) shouldMatch
+data RequestSpecsTest a = RequestSpecsTest
+  { stToDesc :: String -> String
+  , stSettings :: ProxySettings
+  , stAssertReplies :: HttpReply -> HttpReply -> IO ()
+  , stProc :: HList a
+  , stScheme :: String
+  , stCore :: RequestBuilder
+  , stRequestSpecs :: RequestSpecs
+  }
 
 
-secureNotProxiedTest :: Bool -> Spec
-secureNotProxiedTest debug =
-  let scheme = "HTTPS"
-      desc = "Proxy on " ++ scheme ++ " should fail"
-      assertNeq = onDirectAndProxy assertHttpRepliesDiffer debug
-   in aroundAll testWithSecureProxy' $ describe desc $ do
-        for_ testNotProxiedRequests $ \(title, modifier) -> do
-          let shouldNotMatch (f, p) = assertNeq p $ modifier $ nginxHostBuilder f sNil
-          it (scheme ++ " " ++ title) shouldNotMatch
+insecureRequestSpecsTest ::
+  (TmpProc.AreProcs procs, HostOf procs) =>
+  RequestSpecsTest procs ->
+  Bool ->
+  Spec
+insecureRequestSpecsTest st debug =
+  let RequestSpecsTest
+        { stToDesc
+        , stSettings
+        , stAssertReplies
+        , stProc
+        , stScheme
+        , stCore
+        , stRequestSpecs
+        } = st
+      desc = stToDesc stScheme
+      withApp = TmpProc.testWithApplication stProc $ mkSampleApp' stSettings
+   in aroundAll withApp $ describe desc $ do
+        for_ stRequestSpecs $ \(title, modifier) -> do
+          it (stScheme ++ " " ++ title) $ check stAssertReplies modifier debug stCore
+
+
+secureRequestSpecsTest ::
+  (TmpProc.AreProcs procs, HostOf procs) =>
+  RequestSpecsTest procs ->
+  Bool ->
+  Spec
+secureRequestSpecsTest st debug =
+  let RequestSpecsTest
+        { stToDesc
+        , stAssertReplies
+        , stScheme
+        , stCore
+        , stRequestSpecs
+        } = st
+      desc = stToDesc stScheme
+   in aroundAll testWithSecureProxy $ describe desc $ do
+        for_ stRequestSpecs $ \(title, modifier) -> do
+          it (stScheme ++ " " ++ title) $ check stAssertReplies modifier debug stCore
+
+
+insecureRequestSpecs :: [RequestSpecsTest '[HttpBin]]
+insecureRequestSpecs = [insecureRedirects, insecureNotProxied, insecureProxy]
+
+
+insecureProxy :: RequestSpecsTest '[HttpBin]
+insecureProxy =
+  RequestSpecsTest
+    { stToDesc = \s -> "Simple " ++ s ++ " proxying:"
+    , stSettings = defaultTestSettings
+    , stAssertReplies = assertHttpRepliesAreEq
+    , stProc = onlyHttpBin
+    , stScheme = "HTTP"
+    , stCore = nil
+    , stRequestSpecs = testRequests
+    }
+
+
+insecureRedirects :: RequestSpecsTest '[HttpBin]
+insecureRedirects =
+  RequestSpecsTest
+    { stToDesc = \s -> "Proxy over " ++ s ++ " with too many redirects differs"
+    , stSettings = redirectTestSettings
+    , stAssertReplies = assertHttpRepliesDiffer
+    , stProc = onlyHttpBin
+    , stScheme = "HTTP"
+    , stCore = nil
+    , stRequestSpecs = testOverRedirectedRequests
+    }
+
+
+insecureNotProxied :: RequestSpecsTest '[HttpBin]
+insecureNotProxied =
+  RequestSpecsTest
+    { stToDesc = \s -> "Proxy on " ++ s ++ " should fail"
+    , stSettings = defaultTestSettings
+    , stAssertReplies = assertHttpRepliesDiffer
+    , stProc = onlyHttpBin
+    , stScheme = "HTTP"
+    , stCore = nil
+    , stRequestSpecs = testNotProxiedRequests
+    }
+
+
+secureRequestSpecs :: [RequestSpecsTest '[NginxGateway, HttpBin]]
+secureRequestSpecs = [secureNotProxied, secureProxy]
+
+
+secureNotProxied :: RequestSpecsTest '[NginxGateway, HttpBin]
+secureNotProxied =
+  RequestSpecsTest
+    { stToDesc = \s -> "Proxy on " ++ s ++ " should fail"
+    , stSettings = defaultTestSettings
+    , stAssertReplies = assertHttpRepliesDiffer
+    , stProc = nginxAndHttpBin
+    , stScheme = "HTTPS"
+    , stCore = sNil
+    , stRequestSpecs = testNotProxiedRequests
+    }
+
+
+secureProxy :: RequestSpecsTest '[NginxGateway, HttpBin]
+secureProxy =
+  RequestSpecsTest
+    { stToDesc = \s -> "Simple " ++ s ++ " proxying:"
+    , stSettings = defaultTestSettings
+    , stAssertReplies = assertHttpRepliesAreEq
+    , stProc = nginxAndHttpBin
+    , stScheme = "HTTPS"
+    , stCore = sNil
+    , stRequestSpecs = testRequests
+    }
 
 
 sNil :: RequestBuilder
 sNil = secure nil
 
 
--- let shouldNotMatch (f, p) = assertNeq p $ modifier $ tmpHostBuilder f def'
--- it (scheme ++ " " ++ title) shouldNotMatch
-
-secureProxyTest :: Bool -> Spec
-secureProxyTest debug =
-  let scheme = "HTTPS"
-      desc = "Simple " ++ scheme ++ " proxying:"
-      assertEq = onDirectAndProxy assertHttpRepliesAreEq debug
-   in aroundAll testWithSecureProxy' $ describe desc $ do
-        for_ testRequests $ \(title, modifier) -> do
-          let shouldMatch (f, p) = assertEq p $ modifier $ nginxHostBuilder f sNil
-          it (scheme ++ " " ++ title) shouldMatch
+class HostOf a where
+  hostOf :: HandlesOf a -> ByteString
 
 
--- let shouldMatch (f, p) = assertEq p $ modifier $ tmpHostBuilder f def'
--- it (scheme ++ " " ++ title) shouldMatch
+instance HostOf '[HttpBin] where
+  hostOf f = encodeUtf8 $ hAddr $ handleOf @"tmp-http-bin" Proxy f
+
+
+instance HostOf '[NginxGateway, HttpBin] where
+  hostOf f = encodeUtf8 $ hAddr $ handleOf @"nginx-test" Proxy f
+
+
+hostBuilder :: (HostOf a) => HandlesOf a -> RequestBuilder -> RequestBuilder
+hostBuilder f builder = builder {rbHost = hostOf f}
+
 
 type ReverseProxyFixture = HandlesOf '[NginxGateway, HttpBin]
 
@@ -253,14 +314,6 @@ nginxAndHttpBin :: HList '[NginxGateway, HttpBin]
 nginxAndHttpBin = aGateway &:& HttpBin
 
 
-setupReverseProxy :: IO ReverseProxyFixture
-setupReverseProxy = startupAll nginxAndHttpBin
-
-
-withReverseProxy :: SpecWith ReverseProxyFixture -> Spec
-withReverseProxy = beforeAll setupReverseProxy . afterAll terminateAll
-
-
 -- | A data type representing a connection to a HttpBin server.
 data HttpBin = HttpBin
 
@@ -272,20 +325,10 @@ onlyHttpBin :: HList '[HttpBin]
 onlyHttpBin = HttpBin &: HNil
 
 
-setupHttpBin :: IO HttpBinFixture
-setupHttpBin = startupAll onlyHttpBin
-
-
-withHttpBin :: SpecWith HttpBinFixture -> Spec
-withHttpBin = beforeAll setupHttpBin . afterAll terminateAll
-
-
 -- | Run HttpBin using tmp-proc.
 instance Proc HttpBin where
   type Image HttpBin = "kennethreitz/httpbin"
   type Name HttpBin = "tmp-http-bin"
-
-
   uriOf = mkUri'
   runArgs = []
   reset _ = pure ()
