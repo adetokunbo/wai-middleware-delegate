@@ -9,12 +9,13 @@ module Test.TestRequests
   , testPostRequests
   , testNotProxiedRequests
   , testOverRedirectedRequests
+  , nil
+  , secure
   )
 where
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
-import Data.Default (Default (..))
 import Data.Maybe (fromMaybe)
 import Network.HTTP.Client
   ( Request
@@ -38,16 +39,20 @@ data RequestBuilder = RequestBuilder
   }
 
 
-instance Default RequestBuilder where
-  def =
-    RequestBuilder
-      { rbMethod = methodGet
-      , rbSecure = False
-      , rbPath = "/"
-      , rbBody = Nothing
-      , rbHost = "httpbin.org"
-      , rbPort = Nothing
-      }
+nil :: RequestBuilder
+nil =
+  RequestBuilder
+    { rbMethod = methodGet
+    , rbSecure = False
+    , rbPath = "/"
+    , rbBody = Nothing
+    , rbHost = "httpbin.org"
+    , rbPort = Nothing
+    }
+
+
+secure :: RequestBuilder -> RequestBuilder
+secure x = x {rbSecure = True}
 
 
 testRequests :: [(String, RequestBuilder -> RequestBuilder)]
@@ -58,32 +63,31 @@ testGetRequests :: [(String, RequestBuilder -> RequestBuilder)]
 testGetRequests =
   [
     ( "GET"
-    , (\builder -> builder {rbPath = "/get"})
+    , \builder -> builder {rbPath = "/get"}
     )
   ,
     ( "GET (with a query)"
-    , (\builder -> builder {rbPath = "/get?a=10&b=whatever"})
+    , \builder -> builder {rbPath = "/get?a=10&b=whatever"}
     )
   ,
     ( "GET (multiple redirects)"
-    , (\builder -> builder {rbPath = "/redirect/3"})
+    , \builder -> builder {rbPath = "/redirect/3"}
     )
   ,
     ( "GET (with a body)"
-    , ( \builder ->
-          builder
-            { rbPath = "/get"
-            , rbBody = Just $ RequestBodyBS "Hello httpbin!"
-            }
-      )
+    , \builder ->
+        builder
+          { rbPath = "/get"
+          , rbBody = Just $ RequestBodyBS "Hello httpbin!"
+          }
     )
   ,
     ( "GET (forbidden resource)"
-    , (\builder -> builder {rbPath = "/status/403"})
+    , \builder -> builder {rbPath = "/status/403"}
     )
   ,
     ( "GET (missing resource)"
-    , (\builder -> builder {rbPath = "/status/404"})
+    , \builder -> builder {rbPath = "/status/404"}
     )
   ]
 
@@ -92,7 +96,7 @@ testNotProxiedRequests :: [(String, RequestBuilder -> RequestBuilder)]
 testNotProxiedRequests =
   [
     ( "GET (funny resource - differs on proxy)"
-    , (\builder -> builder {rbPath = "/status/418"})
+    , \builder -> builder {rbPath = "/status/418"}
     )
   ]
 
@@ -101,7 +105,7 @@ testOverRedirectedRequests :: [(String, RequestBuilder -> RequestBuilder)]
 testOverRedirectedRequests =
   [
     ( "GET (multiple redirects)"
-    , (\builder -> builder {rbPath = "/redirect/3"})
+    , \builder -> builder {rbPath = "/redirect/3"}
     )
   ]
 
@@ -110,29 +114,28 @@ testPostRequests :: [(String, RequestBuilder -> RequestBuilder)]
 testPostRequests =
   [
     ( "POST"
-    , (\builder -> builder {rbMethod = methodPost, rbPath = "/post"})
+    , \builder -> builder {rbMethod = methodPost, rbPath = "/post"}
     )
   ,
     ( "POST (with a query)"
-    , (\builder -> builder {rbMethod = methodPost, rbPath = "/post?a=10&b=whatever"})
+    , \builder -> builder {rbMethod = methodPost, rbPath = "/post?a=10&b=whatever"}
     )
   ,
     ( "POST (with a body)"
-    , ( \builder ->
-          builder
-            { rbPath = "/post"
-            , rbBody = Just $ RequestBodyBS "Hello httpbin!"
-            , rbMethod = methodPost
-            }
-      )
+    , \builder ->
+        builder
+          { rbPath = "/post"
+          , rbBody = Just $ RequestBodyBS "Hello httpbin!"
+          , rbMethod = methodPost
+          }
     )
   ,
     ( "POST (forbidden resource)"
-    , (\builder -> builder {rbMethod = methodPost, rbPath = "/status/403"})
+    , \builder -> builder {rbMethod = methodPost, rbPath = "/status/403"}
     )
   ,
     ( "POST (missing resource)"
-    , (\builder -> builder {rbMethod = methodPost, rbPath = "/status/404"})
+    , \builder -> builder {rbMethod = methodPost, rbPath = "/status/404"}
     )
   ]
 
@@ -144,7 +147,7 @@ buildRequest RequestBuilder {rbMethod, rbSecure, rbPath, rbBody, rbHost, rbPort}
         | rbSecure = "https"
         | otherwise = "http"
       portStr = maybe "" (\x -> ":" ++ show x) rbPort
-      url = scheme ++ "://" ++ (C8.unpack rbHost) ++ portStr ++ rbPath
+      url = scheme ++ "://" ++ C8.unpack rbHost ++ portStr ++ rbPath
   req <- parseRequest url
   return $
     req
