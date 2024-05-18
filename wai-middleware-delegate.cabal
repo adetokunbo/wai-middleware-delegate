@@ -75,7 +75,7 @@ test-suite integration-test
     , case-insensitive
     , conduit
     , conduit-extra
-    , crypton-connection       >=0.3.1
+    , crypton-connection       >=0.3.1 && < 0.4
     , data-default
     , directory                >=1.3 && <1.4
     , filepath                 >=1.4 && <1.6
@@ -91,7 +91,7 @@ test-suite integration-test
     , temporary                >=1.2 && <1.5
     , test-certs               >=0.1 && <0.2
     , text
-    , tmp-proc                 >=0.5.2
+    , tmp-proc                 >=0.7
     , vault
     , wai
     , wai-conduit
