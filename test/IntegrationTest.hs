@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -84,8 +85,8 @@ main = do
   hSetBuffering stdout NoBuffering
   dumpDebug <- isJust <$> lookupEnv "DEBUG"
   hspec $ tdescribe "accessing http-bin in docker" $ do
-    forM_ insecureRequestSpecs $ flip insecureRequestSpecsTest dumpDebug
-    forM_ secureRequestSpecs $ flip secureRequestSpecsTest dumpDebug
+    forM_ insecureRequestSpecs $ flip runRequestSpecsTest dumpDebug
+    forM_ secureRequestSpecs $ flip runRequestSpecsTest dumpDebug
 
 
 mkSampleApp :: ProxySettings -> IO Application
@@ -156,6 +157,7 @@ type RequestSpecs = [(String, RequestBuilder -> RequestBuilder)]
 data RequestSpecsTest a = RequestSpecsTest
   { stToDesc :: String -> String
   , stSettings :: ProxySettings
+  , stWithApp :: forall b. HList a -> ProxySettings -> ((HandlesOf a, Port) -> IO b) -> IO b
   , stAssertReplies :: HttpReply -> HttpReply -> IO ()
   , stProc :: HList a
   , stScheme :: String
@@ -164,12 +166,33 @@ data RequestSpecsTest a = RequestSpecsTest
   }
 
 
-insecureRequestSpecsTest ::
+withSecureApp ::
+  (HostOf a, TmpProc.AreProcs a) =>
+  HList a ->
+  ProxySettings ->
+  ((HandlesOf a, Port) -> IO b) ->
+  IO b
+withSecureApp procs settings action = withCertPathsInTmp' $ \cp -> do
+  let tls = tlsSettings (certificatePath cp) (keyPath cp)
+      app = mkSampleApp' settings
+  TmpProc.testWithTLSApplication tls procs app action
+
+
+withInsecureApp ::
+  (HostOf a, TmpProc.AreProcs a) =>
+  HList a ->
+  ProxySettings ->
+  ((HandlesOf a, Port) -> IO b) ->
+  IO b
+withInsecureApp procs settings = TmpProc.testWithApplication procs $ mkSampleApp' settings
+
+
+runRequestSpecsTest ::
   (TmpProc.AreProcs procs, HostOf procs) =>
   RequestSpecsTest procs ->
   Bool ->
   Spec
-insecureRequestSpecsTest st debug =
+runRequestSpecsTest st debug =
   let RequestSpecsTest
         { stToDesc
         , stSettings
@@ -178,29 +201,11 @@ insecureRequestSpecsTest st debug =
         , stScheme
         , stCore
         , stRequestSpecs
+        , stWithApp
         } = st
       desc = stToDesc stScheme
-      withApp = TmpProc.testWithApplication stProc $ mkSampleApp' stSettings
+      withApp = stWithApp stProc stSettings
    in aroundAll withApp $ describe desc $ do
-        for_ stRequestSpecs $ \(title, modifier) -> do
-          it (stScheme ++ " " ++ title) $ check stAssertReplies modifier debug stCore
-
-
-secureRequestSpecsTest ::
-  (TmpProc.AreProcs procs, HostOf procs) =>
-  RequestSpecsTest procs ->
-  Bool ->
-  Spec
-secureRequestSpecsTest st debug =
-  let RequestSpecsTest
-        { stToDesc
-        , stAssertReplies
-        , stScheme
-        , stCore
-        , stRequestSpecs
-        } = st
-      desc = stToDesc stScheme
-   in aroundAll testWithSecureProxy $ describe desc $ do
         for_ stRequestSpecs $ \(title, modifier) -> do
           it (stScheme ++ " " ++ title) $ check stAssertReplies modifier debug stCore
 
@@ -219,6 +224,7 @@ insecureProxy =
     , stScheme = "HTTP"
     , stCore = nil
     , stRequestSpecs = testRequests
+    , stWithApp = withInsecureApp
     }
 
 
@@ -232,6 +238,7 @@ insecureRedirects =
     , stScheme = "HTTP"
     , stCore = nil
     , stRequestSpecs = testOverRedirectedRequests
+    , stWithApp = withInsecureApp
     }
 
 
@@ -245,6 +252,7 @@ insecureNotProxied =
     , stScheme = "HTTP"
     , stCore = nil
     , stRequestSpecs = testNotProxiedRequests
+    , stWithApp = withInsecureApp
     }
 
 
@@ -262,6 +270,7 @@ secureNotProxied =
     , stScheme = "HTTPS"
     , stCore = sNil
     , stRequestSpecs = testNotProxiedRequests
+    , stWithApp = withSecureApp
     }
 
 
@@ -275,6 +284,7 @@ secureProxy =
     , stScheme = "HTTPS"
     , stCore = sNil
     , stRequestSpecs = testRequests
+    , stWithApp = withSecureApp
     }
 
 
