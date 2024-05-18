@@ -50,6 +50,8 @@ library
     , wai-conduit        ^>=3.0.0.4
 
   default-language: Haskell2010
+  ghc-options:
+    -Wall -Wincomplete-uni-patterns -Wpartial-fields -fwarn-tabs
 
 test-suite integration-test
   type:             exitcode-stdio-1.0
@@ -99,4 +101,5 @@ test-suite integration-test
     , unix                     >=2.7 && <2.9
 
   default-language: Haskell2010
-  ghc-options:      -Wall -fwarn-tabs -threaded
+  ghc-options:
+    -Wall -Wincomplete-uni-patterns -Wpartial-fields -fwarn-tabs -threaded
