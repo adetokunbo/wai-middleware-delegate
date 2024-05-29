@@ -24,7 +24,7 @@ import Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import Data.Int (Int64)
 import Data.Maybe (fromMaybe)
-import Network.Connection (TLSSettings (..))
+import Network.Connection.CPP (noCheckSettings)
 import Network.HTTP.Client
   ( BodyReader
   , Request
@@ -39,14 +39,13 @@ import Network.HTTP.Client
   , withResponse
   )
 import Network.HTTP.Client.TLS (mkManagerSettings)
--- import Network.HTTP.Simple (setRequestManager, withResponse)
 import Network.HTTP.Types (hContentLength, statusCode)
 import Test.HttpReply
 
 
 fetch :: Request -> IO HttpReply
 fetch req = do
-  let mSettings = mkManagerSettings (TLSSettingsSimple True False False) Nothing
+  let mSettings = mkManagerSettings noCheckSettings Nothing
       mSettings' = managerSetProxy proxyFromRequest mSettings
   m <- newManager mSettings'
   withResponse req m getSrc
