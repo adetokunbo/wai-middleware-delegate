@@ -30,7 +30,7 @@ import Data.List (find)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
-import Network.Connection (TLSSettings (..))
+import Network.Connection.CPP (noCheckSettings)
 import qualified Network.HTTP.Client as HC
 import qualified Network.HTTP.Client.TLS as HC
 import Network.HTTP.Types.Header (hHost)
@@ -217,9 +217,8 @@ pingHttps handle = toPinged @HC.HttpException Proxy $ do
 -- that differs from the connection IP address, that's not supported by
 -- http-client-tls
 mkBadTlsManager :: IO HC.Manager
-mkBadTlsManager = do
-  let tlsSettings = TLSSettingsSimple True False False
-  HC.newTlsManagerWith $ HC.mkManagerSettings tlsSettings Nothing
+mkBadTlsManager =
+  HC.newTlsManagerWith $ HC.mkManagerSettings noCheckSettings Nothing
 
 
 -- | Determine the status from a secure Get to host localhost.
