@@ -13,7 +13,6 @@ module Main where
 import Control.Monad (forM_, when)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as C8
-import Data.Default (Default (..))
 import Data.Foldable (for_)
 import Data.Maybe (isJust)
 import Data.Proxy (Proxy (..))
@@ -31,6 +30,7 @@ import Network.Wai.Handler.Warp (Port)
 import Network.Wai.Handler.WarpTLS (tlsSettings)
 import Network.Wai.Middleware.Delegate
   ( ProxySettings (..)
+  , defaultSettings
   , delegateToProxy
   )
 import System.Environment (lookupEnv)
@@ -68,7 +68,7 @@ import Test.TestRequests
 
 
 defaultTestSettings :: ProxySettings
-defaultTestSettings = def {proxyHost = "httpbin.org", proxyTimeout = 2}
+defaultTestSettings = defaultSettings {proxyHost = "httpbin.org", proxyTimeout = 2}
 
 
 redirectTestSettings :: ProxySettings
