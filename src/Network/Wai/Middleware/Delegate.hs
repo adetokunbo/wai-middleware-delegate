@@ -234,10 +234,10 @@ defaultClientPort req
 toClientSettings :: Wai.Request -> ClientSettings
 toClientSettings req =
   case C8.break (== ':') $ Wai.rawPathInfo req of
-    (host, "") -> clientSettingsTCP (defaultClientPort req) host
-    (host, port') -> case C8.readInt $ C8.drop 1 port' of
-      Just (port, _) -> clientSettingsTCP port host
-      Nothing -> clientSettingsTCP (defaultClientPort req) host
+    (h, "") -> clientSettingsTCP (defaultClientPort req) h
+    (h, p') -> case C8.readInt $ C8.drop 1 p' of
+      Just (p, _) -> clientSettingsTCP p h
+      Nothing -> clientSettingsTCP (defaultClientPort req) h
 
 
 dropUpstreamHeaders :: (HeaderName, b) -> Bool
