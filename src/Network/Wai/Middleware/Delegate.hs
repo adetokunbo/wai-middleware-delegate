@@ -52,8 +52,7 @@ import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy.Char8 as LC8
 import Data.CaseInsensitive (mk)
 import Data.Conduit
-  ( ConduitM
-  , ConduitT
+  ( ConduitT
   , Flush (..)
   , Void
   , await
@@ -68,13 +67,11 @@ import Data.Conduit.Network (appSink, appSource)
 import Data.Default (Default (..))
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Int (Int64)
-import Data.Monoid ((<>))
 import Data.Streaming.Network
   ( ClientSettings
   , clientSettingsTCP
   , runTCPClient
   )
-import Data.String (IsString)
 import Network.HTTP.Client
   ( BodyReader
   , GivesPopper
@@ -87,11 +84,9 @@ import Network.HTTP.Client
   , withResponse
   )
 import Network.HTTP.Types
-  ( Header
-  , HeaderName
+  ( HeaderName
   , hContentType
   , internalServerError500
-  , status304
   , status500
   )
 import Network.HTTP.Types.Header (hHost)
