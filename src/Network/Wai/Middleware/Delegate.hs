@@ -30,6 +30,7 @@ module Network.Wai.Middleware.Delegate
 
     -- * Configuration
   , ProxySettings (..)
+  , defaultSettings
 
     -- * Aliases
   , RequestPredicate
@@ -138,22 +139,26 @@ data ProxySettings = ProxySettings
 
 
 instance Default ProxySettings where
-  def =
-    ProxySettings
-      { -- defaults to returning internal server error showing the error in the body
-        proxyOnException = onException
-      , -- default to 15 seconds
-        proxyTimeout = 15
-      , proxyHost = "localhost"
-      , proxyRedirectCount = 0
-      }
-    where
-      onException :: SomeException -> Wai.Response
-      onException e =
-        Wai.responseLBS
-          internalServerError500
-          [(hContentType, "text/plain; charset=utf-8")]
-          $ LC8.fromChunks [C8.pack $ show e]
+  def = defaultSettings
+
+
+defaultSettings :: ProxySettings
+defaultSettings =
+  ProxySettings
+    { -- defaults to returning internal server error showing the error in the body
+      proxyOnException = onException
+    , -- default to 15 seconds
+      proxyTimeout = 15
+    , proxyHost = "localhost"
+    , proxyRedirectCount = 0
+    }
+  where
+    onException :: SomeException -> Wai.Response
+    onException e =
+      Wai.responseLBS
+        internalServerError500
+        [(hContentType, "text/plain; charset=utf-8")]
+        $ LC8.fromChunks [C8.pack $ show e]
 
 
 -- | A Wai Application that acts as a http/https proxy.
