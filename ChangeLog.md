@@ -2,6 +2,12 @@
 
 `wai-middleware-delegate` uses [PVP Versioning][1].
 
+## 0.1.4.2 -- 2024-10-27
+
+* Export defaultSettings as an alternative to Default#def
+
+* Add comments 'deprecating' the Default instance of ProxySettings
+
 ## 0.1.4.1 -- 2024-03-17
 
 * Relax the upper bounds on bytestring to allow bytestring 0.12.1
