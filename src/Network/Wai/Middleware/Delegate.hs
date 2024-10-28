@@ -30,6 +30,7 @@ module Network.Wai.Middleware.Delegate
 
     -- * Configuration
   , ProxySettings (..)
+  , defaultSettings
 
     -- * Aliases
   , RequestPredicate
@@ -51,8 +52,7 @@ import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy.Char8 as LC8
 import Data.CaseInsensitive (mk)
 import Data.Conduit
-  ( ConduitM
-  , ConduitT
+  ( ConduitT
   , Flush (..)
   , Void
   , await
@@ -67,13 +67,11 @@ import Data.Conduit.Network (appSink, appSource)
 import Data.Default (Default (..))
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Int (Int64)
-import Data.Monoid ((<>))
 import Data.Streaming.Network
   ( ClientSettings
   , clientSettingsTCP
   , runTCPClient
   )
-import Data.String (IsString)
 import Network.HTTP.Client
   ( BodyReader
   , GivesPopper
@@ -86,11 +84,9 @@ import Network.HTTP.Client
   , withResponse
   )
 import Network.HTTP.Types
-  ( Header
-  , HeaderName
+  ( HeaderName
   , hContentType
   , internalServerError500
-  , status304
   , status500
   )
 import Network.HTTP.Types.Header (hHost)
@@ -137,23 +133,34 @@ data ProxySettings = ProxySettings
   }
 
 
+{- | This instance is DEPRECATED and will removed in a later release.
+please use 'defaultSettings' instead
+-}
 instance Default ProxySettings where
-  def =
-    ProxySettings
-      { -- defaults to returning internal server error showing the error in the body
-        proxyOnException = onException
-      , -- default to 15 seconds
-        proxyTimeout = 15
-      , proxyHost = "localhost"
-      , proxyRedirectCount = 0
-      }
-    where
-      onException :: SomeException -> Wai.Response
-      onException e =
-        Wai.responseLBS
-          internalServerError500
-          [(hContentType, "text/plain; charset=utf-8")]
-          $ LC8.fromChunks [C8.pack $ show e]
+  -- This is DEPRECATED, please use 'defaultSettings' instead
+  def = defaultSettings
+
+
+{- | A default 'ProxySettings' that makes simplistic assumptions, e.g, that
+target host is @localhost@
+-}
+defaultSettings :: ProxySettings
+defaultSettings =
+  ProxySettings
+    { -- defaults to returning internal server error showing the error in the body
+      proxyOnException = onException
+    , -- default to 15 seconds
+      proxyTimeout = 15
+    , proxyHost = "localhost"
+    , proxyRedirectCount = 0
+    }
+  where
+    onException :: SomeException -> Wai.Response
+    onException e =
+      Wai.responseLBS
+        internalServerError500
+        [(hContentType, "text/plain; charset=utf-8")]
+        $ LC8.fromChunks [C8.pack $ show e]
 
 
 -- | A Wai Application that acts as a http/https proxy.
@@ -229,10 +236,10 @@ defaultClientPort req
 toClientSettings :: Wai.Request -> ClientSettings
 toClientSettings req =
   case C8.break (== ':') $ Wai.rawPathInfo req of
-    (host, "") -> clientSettingsTCP (defaultClientPort req) host
-    (host, port') -> case C8.readInt $ C8.drop 1 port' of
-      Just (port, _) -> clientSettingsTCP port host
-      Nothing -> clientSettingsTCP (defaultClientPort req) host
+    (h, "") -> clientSettingsTCP (defaultClientPort req) h
+    (h, p') -> case C8.readInt $ C8.drop 1 p' of
+      Just (p, _) -> clientSettingsTCP p h
+      Nothing -> clientSettingsTCP (defaultClientPort req) h
 
 
 dropUpstreamHeaders :: (HeaderName, b) -> Bool
