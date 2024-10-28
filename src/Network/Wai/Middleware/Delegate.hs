@@ -133,10 +133,17 @@ data ProxySettings = ProxySettings
   }
 
 
+{- | This instance is DEPRECATED and will removed in a later release.
+please use 'defaultSettings' instead
+-}
 instance Default ProxySettings where
+  -- This is DEPRECATED, please use 'defaultSettings' instead
   def = defaultSettings
 
 
+{- | A default 'ProxySettings' that makes simplistic assumptions, e.g, that
+target host is @localhost@
+-}
 defaultSettings :: ProxySettings
 defaultSettings =
   ProxySettings
