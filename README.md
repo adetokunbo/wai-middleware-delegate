@@ -15,15 +15,16 @@ handled by a delegate application that proxies requests to another server.
 ```haskell
 {-# LANGUAGE OverloadedStrings #-}
 
-import  Data.Default                    (Default (..))
 import  Network.HTTP.Client.TLS         (newTlsManager)
 import  Network.HTTP.Types              (status500)
 import  Network.Wai
 import  Network.Wai.Handler.Warp        (run)
-import  Network.Wai.Middleware.Delegate (ProxySettings (..), delegateToProxy)
+import  Network.Wai.Middleware.Delegate (ProxySettings (..),
+                                         defaultSettings,
+                                         delegateToProxy)
 
 demoSettings :: ProxySettings
-demoSettings = def { proxyHost = "httpbin.org" }
+demoSettings = defaultSettings { proxyHost = "httpbin.org" }
 
 -- | An trivial app that proxies every request to httpbin.org
 httpBin :: ProxySettings -> IO Application
