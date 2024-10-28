@@ -2,7 +2,7 @@
 
 `wai-middleware-delegate` uses [PVP Versioning][1].
 
-## 0.1.4.2 -- 2024-10-27
+## 0.1.4.2 -- 2024-10-28
 
 * Export defaultSettings as an alternative to Default#def
 
