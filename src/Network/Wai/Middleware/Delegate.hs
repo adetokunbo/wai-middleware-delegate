@@ -64,7 +64,6 @@ import Data.Conduit
   , (.|)
   )
 import Data.Conduit.Network (appSink, appSource)
-import Data.Default (Default (..))
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Int (Int64)
 import Data.Streaming.Network
@@ -131,14 +130,6 @@ data ProxySettings = ProxySettings
   , proxyRedirectCount :: Int
   -- ^ The number of redirects to follow. 0 means none, which is the default.
   }
-
-
-{- | This instance is DEPRECATED and will removed in a later release.
-please use 'defaultSettings' instead
--}
-instance Default ProxySettings where
-  -- This is DEPRECATED, please use 'defaultSettings' instead
-  def = defaultSettings
 
 
 {- | A default 'ProxySettings' that makes simplistic assumptions, e.g, that
