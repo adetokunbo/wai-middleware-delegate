@@ -2,9 +2,10 @@
 
 `wai-middleware-delegate` uses [PVP Versioning][1].
 
-## 0.2.0.0 -- 2024-10-28
+## 0.2.0.0 -- 2024-11-05
 
-*  Remove the Default instance of ProxySettings
+* Relax the upper bounds of the data-default version used by the tests
+* Remove the Default instance of ProxySettings
 
 ## 0.1.5.0 -- 2024-10-28
 
