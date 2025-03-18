@@ -30,6 +30,7 @@ import Data.List (find)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
+import Fmt ((+|), (|+))
 import Network.Connection.CPP (noCheckSettings)
 import qualified Network.HTTP.Client as HC
 import qualified Network.HTTP.Client.TLS as HC
@@ -53,13 +54,6 @@ import System.TmpProc
   , toPinged
   )
 import Test.Certs.Temp (CertPaths (..), defaultConfig, generateAndStore)
-import Text.Mustache
-  ( ToMustache (..)
-  , automaticCompile
-  , object
-  , substitute
-  , (~>)
-  )
 
 
 -- | Run Nginx as a temporary process.
@@ -94,13 +88,13 @@ data NginxGateway = NginxGateway
   deriving (Eq, Show)
 
 
-instance ToMustache NginxGateway where
-  toMustache nt =
-    object
-      [ "commonName" ~> ngCommonName nt
-      , "targetPort" ~> ngTargetPort nt
-      , "targetName" ~> ngTargetName nt
-      ]
+substitute' :: Text -> (NginxGateway, NginxPrep) -> Text
+substitute' template (ng, np) =
+  let withCName = Text.replace "{commonName}" (ngCommonName ng)
+      withTName = Text.replace "{targetName}" (ngTargetName ng)
+      withPort = Text.replace "{targetPort}" ("" +| ngTargetPort ng |+ "")
+      withTargetDir = Text.replace "{targetDir}" (Text.pack (npVolumeRoot np))
+   in withCName $ withTName $ withPort $ withTargetDir template
 
 
 -- | Values obtained while preparing to launch the nginx container
@@ -110,13 +104,6 @@ data NginxPrep = NginxPrep
   , npVolumeRoot :: !FilePath
   }
   deriving (Eq, Show)
-
-
-instance ToMustache NginxPrep where
-  toMustache np =
-    object
-      [ "targetDir" ~> npVolumeRoot np
-      ]
 
 
 templateName :: FilePath
@@ -181,24 +168,21 @@ prepare' views nt@NginxGateway {ngTargetName = name} = do
     Nothing -> error $ "could not find host " <> show name
     Just _ -> do
       templateDir <- (</> "templates") <$> getDataDir
-      compiled <- automaticCompile [templateDir] templateName
-      case compiled of
-        Left err -> error $ "the template did not compile:" ++ show err
-        Right template -> do
-          npVolumeRoot <- createWorkingDirs
-          npUserID <- getEffectiveUserID
-          npGroupID <- getEffectiveGroupID
-          let (confDir, cpDir) = toConfCertsDirs npVolumeRoot
-              cp =
-                CertPaths
-                  { cpKey = "key.pem"
-                  , cpCert = "certificate.pem"
-                  , cpDir
-                  }
-              np = NginxPrep {npUserID, npGroupID, npVolumeRoot}
-          generateAndStore cp defaultConfig
-          Text.writeFile (confDir </> "nginx.conf") $ substitute template (nt, np)
-          pure np
+      templateTxt <- Text.readFile (templateDir </> templateName)
+      npVolumeRoot <- createWorkingDirs
+      npUserID <- getEffectiveUserID
+      npGroupID <- getEffectiveGroupID
+      let (confDir, cpDir) = toConfCertsDirs npVolumeRoot
+          cp =
+            CertPaths
+              { cpKey = "key.pem"
+              , cpCert = "certificate.pem"
+              , cpDir
+              }
+          np = NginxPrep {npUserID, npGroupID, npVolumeRoot}
+      generateAndStore cp defaultConfig
+      Text.writeFile (confDir </> "nginx.conf") $ substitute' templateTxt (nt, np)
+      pure np
 
 
 -- | Make a uri access the http-bin server.
