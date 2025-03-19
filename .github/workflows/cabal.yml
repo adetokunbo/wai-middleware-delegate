@@ -21,7 +21,7 @@ jobs:
     strategy:
       matrix:
         cabal: ["3.6", "3.8"]
-        ghc: ["8.10.7", "9.0.2", "9.2.4", "9.4.1"]
+        ghc: ["8.10.7", "9.0.2", "9.2.4", "9.4.8", "9.6.6"]
     env:
       CONFIG: "--enable-tests --enable-benchmarks --flags=dev"
     steps:
