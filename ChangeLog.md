@@ -2,6 +2,10 @@
 
 `wai-middleware-delegate` uses [PVP Versioning][1].
 
+## 0.2.0.1 -- 2025-03-19
+
+* Relax the upper bounds on the text dependency
+
 ## 0.2.0.0 -- 2024-11-05
 
 * Relax the upper bounds of the data-default version used by the tests
