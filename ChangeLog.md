@@ -2,6 +2,10 @@
 
 `wai-middleware-delegate` uses [PVP Versioning][1].
 
+## 0.2.0.2 -- 2026-04-05
+
+* Relax the upper bounds on the wai-middleware-delegate dependency
+
 ## 0.2.0.1 -- 2025-03-19
 
 * Relax the upper bounds on the text dependency
